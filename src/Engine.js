@@ -11,10 +11,6 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * 
- * 
- * 
- * asdasd
  * limitations under the License.
  */
 import HookCenter from './core/HookCenter';
@@ -48,6 +44,7 @@ export default class Engine {
     });
     this.initMath(markdownParams);
     this.$configInit(markdownParams);
+    // sasdasdasd
     this.hookCenter = new HookCenter(hooksConfig, markdownParams, cherry);
     this.hooks = this.hookCenter.getHookList();
     this.md5Cache = {};
