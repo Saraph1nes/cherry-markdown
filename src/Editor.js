@@ -40,6 +40,8 @@ import { createElement } from './utils/dom';
 import { imgBase64Reg, imgDrawioXmlReg } from './utils/regexp';
 import { handleNewlineIndentList } from './utils/autoindent';
 
+// ...
+
 /**
  * @typedef {import('~types/editor').EditorConfiguration} EditorConfiguration
  * @typedef {import('~types/editor').EditorEventCallback} EditorEventCallback
