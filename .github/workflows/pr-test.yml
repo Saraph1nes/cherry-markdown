@@ -57,9 +57,7 @@ jobs:
       - name: Lint Changed Files
         if: ${{ env.GIT_DIFF_FILES }}
         run: |
-          for file in ${{ env.GIT_DIFF_FILES }}; do
-            yarn eslint "$file"
-          done
+          yarn eslint --ext .js ${{ env.GIT_DIFF_FILES }}
 
       - name: Run Build
         uses: borales/actions-yarn@v3.0.0
