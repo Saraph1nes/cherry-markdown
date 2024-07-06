@@ -5,3 +5,7 @@ export interface CheckedSidePanelType {
   color: string;
   size: number;
 }
+
+export interface ITest {
+  test: string;
+}
