@@ -57,7 +57,7 @@ const options = {
   },
   plugins: [
     eslint({
-      exclude: ['node_modules/**', 'src/libs/**'],
+      exclude: ['**/node_modules/**', 'src/libs/**'],
     }),
     json(),
     envReplacePlugin(),

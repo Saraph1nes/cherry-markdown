@@ -55,19 +55,22 @@ if (process.env.X_IDE_IS_CLOUDSTUDIO === 'TRUE') {
 }
 
 if (enableHotReload) {
-  const basePath = path.resolve(__dirname, '../../../');
+  const rootPath = path.resolve(__dirname, '../../../');
   options.plugins = options.plugins.concat([
     serve({
       host: process.env.CODESANDBOX_SSE ? '0.0.0.0' : 'localhost',
       port: SERVER_PORT,
-      contentBase: basePath,
+      contentBase: rootPath,
       verbose: true,
       open: true,
-      openPage: 'examples/index.html',
+      openPage: '/examples/index.html',
       historyApiFallback: true,
     }),
     livereload({
-      watch: [path.resolve(__dirname, '../dist'), path.resolve(__dirname, '../../../examples')],
+      watch: [
+        path.resolve(__dirname, `${rootPath}packages/cherry-markdown/dist`),
+        path.resolve(__dirname, `${rootPath}examples`),
+      ],
       delay: 500,
       verbose: true,
     }),
