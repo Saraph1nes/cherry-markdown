@@ -80,7 +80,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-dist
-          path: dist
+          path: packages/cherry-markdown/dist
 
       - name: Archive examples
         uses: actions/upload-artifact@v4
