@@ -86,7 +86,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-examples
-          path: examples
+          path: |
+            examples/*.html
+            examples/markdown
+            examples/scripts
 
   review:
     needs: build
