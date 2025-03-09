@@ -39,6 +39,23 @@ jobs:
             const fs = require('fs');
             const path = require('path');
 
+            // 打印dist和examples目录中的文件
+            const printFiles = (directoryPath) => {
+              const files = fs.readdirSync(directoryPath);
+              console.log(`Files in ${directoryPath}:`);
+              files.forEach(file => {
+                const filePath = path.join(directoryPath, file);
+                if (fs.lstatSync(filePath).isDirectory()) {
+                  console.log(`  [DIR] ${file}`);
+                } else {
+                  console.log(`  [FILE] ${file}`);
+                }
+              });
+            };
+
+            printFiles('dist');
+            printFiles('examples');
+
             const cos = new COS({
               SecretId: '${{ secrets.COS_SECRETID }}',
               SecretKey: '${{ secrets.COS_SECRETKEY }}',
@@ -86,8 +103,8 @@ jobs:
 
             (async () => {
               try {
-                await uploadDirectory('dist', 'pr${{ github.event.pull_request.number }}/dist');
-                await uploadDirectory('examples', 'pr${{ github.event.pull_request.number }}/examples');
+                # await uploadDirectory('dist', 'pr${{ github.event.pull_request.number }}/dist');
+                # await uploadDirectory('examples', 'pr${{ github.event.pull_request.number }}/examples');
                 console.log('Upload success');
               } catch (err) {
                 console.error('Upload failed:', err);
