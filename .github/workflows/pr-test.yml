@@ -11,7 +11,6 @@ on:
 jobs:
   build:
     # 不需要在fork仓库的pr中运行
-    # if: github.repository == 'Tencent/cherry-markdown' && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     env:
       BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -81,13 +80,16 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-dist
-          path: dist
+          path: packages/cherry-markdown/dist
 
       - name: Archive examples
         uses: actions/upload-artifact@v4
         with:
           name: build-examples
-          path: examples
+          path: |
+            examples/*.html
+            examples/markdown
+            examples/scripts
 
   review:
     needs: build
