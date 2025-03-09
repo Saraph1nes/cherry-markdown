@@ -49,9 +49,12 @@ jobs:
               const files = fs.readdirSync(directoryPath);
               files.forEach(file => {
                 const filePath = path.join(directoryPath, file);
-                const key = `${keyPrefix}/${file}`;
+                // 获取相对于根目录的相对路径
+                const relativePath = path.relative(process.cwd(), filePath);
+                // 将相对路径与keyPrefix结合
+                const key = `${keyPrefix}/${relativePath}`;
                 if (fs.lstatSync(filePath).isDirectory()) {
-                  uploadPromises.push(uploadDirectory(filePath, key));
+                  uploadPromises.push(uploadDirectory(filePath, keyPrefix));
                 } else {
                   uploadPromises.push(uploadFile(filePath, key));
                 }
