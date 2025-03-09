@@ -53,8 +53,10 @@ jobs:
               });
             };
 
-            printFiles('dist');
+            // printFiles('dist');
             printFiles('examples');
+
+            console.log('Full path to examples:', path.resolve('examples'));
 
             const cos = new COS({
               SecretId: '${{ secrets.COS_SECRETID }}',
