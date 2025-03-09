@@ -54,7 +54,7 @@ jobs:
             };
 
             // printFiles('dist');
-            printFiles('examples');
+            printFiles(path.resolve('examples'));
 
             console.log('Full path to examples:', path.resolve('examples'));
 
