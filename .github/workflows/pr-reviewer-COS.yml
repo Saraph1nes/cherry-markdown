@@ -103,8 +103,8 @@ jobs:
 
             (async () => {
               try {
-                # await uploadDirectory('dist', 'pr${{ github.event.pull_request.number }}/dist');
-                # await uploadDirectory('examples', 'pr${{ github.event.pull_request.number }}/examples');
+                // await uploadDirectory('dist', 'pr${{ github.event.pull_request.number }}/dist');
+                // await uploadDirectory('examples', 'pr${{ github.event.pull_request.number }}/examples');
                 console.log('Upload success');
               } catch (err) {
                 console.error('Upload failed:', err);
