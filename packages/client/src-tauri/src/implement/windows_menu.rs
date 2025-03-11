@@ -61,8 +61,8 @@ pub fn window_menu(app: &mut App) -> Result<(), tauri::Error> {
             .build()?;
 
     let menu = MenuBuilder::new(handle)
-        .items(&[&file_menu, &language_menu, &setting_menu])
-        .build()?;
+            .items(&[&file_menu, &language_menu, &setting_menu])
+            .build()?;
 
     app.set_menu(menu)?;
 
@@ -70,8 +70,9 @@ pub fn window_menu(app: &mut App) -> Result<(), tauri::Error> {
         move |app_handle: &tauri::AppHandle, event| match event.id().0.as_str() {
             "en" | "zh" => {
                 let lang_str = event.id().0.as_str();
+
                 file_menu
-                    .set_text(language.new_file.get_lang(&lang_str))
+                    .set_text(language.app_name.get_lang(&lang_str))
                     .expect("set file_menu text failed");
                 new_file_menu
                     .set_text(language.new_file.get_lang(&lang_str))
