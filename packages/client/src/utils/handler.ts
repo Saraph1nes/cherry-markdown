@@ -3,6 +3,8 @@ import type { FileStore } from '../store';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { previewOnlySidebar } from './index';
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { invoke } from '@tauri-apps/api/core';
 
 /**
  * New file
@@ -79,4 +81,39 @@ export const saveMarkdown = (cherryMarkdown: Cherry, fileStore: FileStore) => {
     return;
   }
   writeTextFile(fileStore.currentFilePath, markdown);
+};
+
+/**
+ * About menu
+ */
+export const handleAboutMenu = async () => {
+  const window = new WebviewWindow('about', {
+    url: '/about',
+    width: 400,
+    height: 300,
+    title: 'About',
+    resizable: false,
+    skipTaskbar: true,
+    decorations: true,
+    center: false,
+    alwaysOnTop: true,
+    focus: true,
+  });
+  window.once('tauri://created', async () => {
+    console.log('tauri://created');
+  });
+  window.once('tauri://error', async (error) => {
+    console.log('window create error!', error);
+  });
+};
+
+/**
+ * Toggle toolbar
+ * @param cherryMarkdown
+ */
+export const handleToggleToolbar = async (cherryMarkdown: Cherry) => {
+  const cherryNoToolbar = document.querySelector('.cherry--no-toolbar');
+  console.log(cherryNoToolbar, !cherryNoToolbar);
+  await invoke('get_show_toolbar', { show: !!cherryNoToolbar });
+  cherryMarkdown.toolbar.toolbarHandlers.settings('toggleToolbar');
 };
