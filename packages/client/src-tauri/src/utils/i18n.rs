@@ -31,7 +31,7 @@ pub struct Language {
     pub language: BilingualMenuItem,
     pub setting: BilingualMenuItem,
     pub show_toolbar: BilingualMenuItem,
-    pub app_name: BilingualMenuItem,
+    pub about: BilingualMenuItem,
 }
 
 impl Language {
@@ -46,7 +46,7 @@ impl Language {
             language: BilingualMenuItem::new("Language", "语言"),
             setting: BilingualMenuItem::new("Setting", "设置"),
             show_toolbar: BilingualMenuItem::new("Show Toolbar", "显示工具栏"),
-            app_name: BilingualMenuItem::new("Cherry Markdown", "Cherry Markdown"),
+            about: BilingualMenuItem::new("About", "关于"),
         }
     }
 }

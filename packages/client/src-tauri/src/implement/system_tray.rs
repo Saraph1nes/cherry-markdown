@@ -8,7 +8,7 @@ use crate::utils::i18n::Language;
 
 use crate::utils::base::restore_and_focus_window;
 
-pub fn system_tray_menu(app: &mut App) -> Result<(), tauri::Error> {
+pub fn init(app: &mut App) -> Result<(), tauri::Error> {
     let lang_str = "en".to_string();
     let language = Language::new();
 

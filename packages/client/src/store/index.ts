@@ -1,1 +1,1 @@
-export { useFileStore } from './modal/file';
+export { useFileStore, type FileStore } from './modal/file';
