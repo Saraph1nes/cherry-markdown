@@ -1,6 +1,14 @@
 import { listen } from '@tauri-apps/api/event';
 import Cherry from 'cherry-markdown';
-import { handleAboutMenu, handleToggleToolbar, newFile, openFile, saveAsNewMarkdown, saveMarkdown } from './handler';
+import {
+  handleAboutMenu,
+  handleSettingMenu,
+  handleToggleToolbar,
+  newFile,
+  openFile,
+  saveAsNewMarkdown,
+  saveMarkdown,
+} from './handler';
 import type { FileStore } from '../store';
 
 const initListener = (cherryMarkdown: Cherry, fileStore: FileStore) => {
@@ -12,8 +20,8 @@ const initListener = (cherryMarkdown: Cherry, fileStore: FileStore) => {
   });
   listen('save_as', () => saveAsNewMarkdown(cherryMarkdown, fileStore));
   listen('toggle_toolbar', () => handleToggleToolbar(cherryMarkdown));
-  // 关于窗口
   listen('about_menu', handleAboutMenu);
+  listen('setting_menu', handleSettingMenu);
 };
 
 export default initListener;
