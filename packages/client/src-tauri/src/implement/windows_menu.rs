@@ -25,9 +25,13 @@ pub fn init(app: &mut App) -> Result<(), tauri::Error> {
     let about_menu = MenuItemBuilder::with_id("about_menu", language.about.get_lang(&lang_str))
         .build(handle)?;
 
+    let setting_menu = MenuItemBuilder::with_id("setting_menu", language.setting.get_lang(&lang_str))
+        .build(handle)?;
+
     let file_menu = SubmenuBuilder::with_id(handle, "file", language.file.get_lang(&lang_str))
         .items(&[
             &about_menu,
+            &setting_menu,
             &new_file_menu,
             &open_file_menu,
             &save_menu,
@@ -59,13 +63,13 @@ pub fn init(app: &mut App) -> Result<(), tauri::Error> {
             .checked(false)
             .build(handle)?;
 
-    let setting_menu =
-        SubmenuBuilder::with_id(handle, "setting_menu", language.setting.get_lang(&lang_str))
-            .item(&toggle_toolbar)
-            .build()?;
+    // let setting_menu =
+    //     SubmenuBuilder::with_id(handle, "setting", language.setting.get_lang(&lang_str))
+    //         .item(&toggle_toolbar)
+    //         .build()?;
 
     let menu = MenuBuilder::new(handle)
-            .items(&[&file_menu, &language_menu, &setting_menu])
+            .items(&[&file_menu, &language_menu])
             .build()?;
 
     app.set_menu(menu)?;
@@ -110,6 +114,9 @@ pub fn init(app: &mut App) -> Result<(), tauri::Error> {
                 about_menu
                     .set_text(language.about.get_lang(&lang_str))
                     .expect("set about text failed");
+            }
+            "setting_menu" => {
+                let _ = app_handle.emit("setting_menu", "");
             }
             "about_menu" => {
                 let _ = app_handle.emit("about_menu", "");

@@ -89,14 +89,13 @@ export const saveMarkdown = (cherryMarkdown: Cherry, fileStore: FileStore) => {
 export const handleAboutMenu = async () => {
   const window = new WebviewWindow('about', {
     url: '/about',
-    width: 400,
-    height: 300,
+    width: 280,
+    height: 280,
     title: 'About',
     resizable: false,
     skipTaskbar: true,
     decorations: true,
     center: false,
-    alwaysOnTop: true,
     focus: true,
   });
   window.once('tauri://created', async () => {
@@ -116,4 +115,24 @@ export const handleToggleToolbar = async (cherryMarkdown: Cherry) => {
   console.log(cherryNoToolbar, !cherryNoToolbar);
   await invoke('get_show_toolbar', { show: !!cherryNoToolbar });
   cherryMarkdown.toolbar.toolbarHandlers.settings('toggleToolbar');
+};
+
+export const handleSettingMenu = () => {
+  const window = new WebviewWindow('about', {
+    url: '/setting',
+    width: 600,
+    height: 400,
+    title: 'Setting',
+    resizable: false,
+    skipTaskbar: true,
+    decorations: true,
+    center: false,
+    focus: true,
+  });
+  window.once('tauri://created', async () => {
+    console.log('tauri://created');
+  });
+  window.once('tauri://error', async (error) => {
+    console.log('window create error!', error);
+  });
 };

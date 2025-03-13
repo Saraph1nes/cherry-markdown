@@ -12,32 +12,36 @@
 
 <style scoped>
   .about {
+    padding: 20px 10px;
     text-align: center;
+    overflow: hidden;
   }
 
   .logo{
-    width: 90px;
-    height: 90px;
+    width: 60px;
+    height: 60px;
+    margin-right: -20px;
   }
 
   .title{
-    font-size: 20px;
+    font-size: 16px;
   }
 
   .desc{
-    font-size: 14px;
+    font-size: 12px;
     margin: 10px 0;
+    color: #666;
   }
 
   .link{
     color: #007fff;
-    font-size: 14px;
+    font-size: 12px;
     text-decoration: none;
   }
 
   .copyright{
-    margin-top: 50px;
+    margin-top: 20px;
     color: #999;
-    font-size: 12px;
+    font-size: 10px;
   }
 </style>
