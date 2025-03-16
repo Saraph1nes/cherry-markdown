@@ -45,6 +45,8 @@ jobs:
             });
 
             const uploadDirectory = (directoryPath, keyPrefix) => {
+              // 打印要上传的文件名
+              console.log(`Uploading ${directoryPath} to ${keyPrefix}`);
               const uploadPromises = [];
               const files = fs.readdirSync(directoryPath);
               files.forEach(file => {
