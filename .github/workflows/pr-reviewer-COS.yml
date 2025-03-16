@@ -45,8 +45,6 @@ jobs:
             });
 
             const uploadDirectory = (directoryPath, keyPrefix) => {
-              // 打印要上传的文件名
-              console.log(`Uploading ${directoryPath} to ${keyPrefix}`);
               const uploadPromises = [];
               const files = fs.readdirSync(directoryPath);
               files.forEach(file => {
@@ -55,6 +53,8 @@ jobs:
                 if (fs.lstatSync(filePath).isDirectory()) {
                   uploadPromises.push(uploadDirectory(filePath, key));
                 } else {
+                  // 打印要上传的文件名
+                  console.log(`Uploading ${key}...`);
                   uploadPromises.push(uploadFile(filePath, key));
                 }
               });
@@ -87,11 +87,8 @@ jobs:
 
             (async () => {
               try {
-                // await uploadDirectory('download_dist', 'pr${{ github.event.pull_request.number }}/packages/cherry-markdown/dist');
+                await uploadDirectory('download_dist', 'pr${{ github.event.pull_request.number }}/packages/cherry-markdown/dist');
                 await uploadDirectory('download_examples', 'pr${{ github.event.pull_request.number }}/examples');
-                // 列出examples中的所有文件
-                const files = fs.readdirSync('examples');
-                console.log(files);
                 console.log('Upload success');
               } catch (err) {
                 console.error('Upload failed:', err);
