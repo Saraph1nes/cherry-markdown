@@ -88,7 +88,7 @@ jobs:
             (async () => {
               try {
                 // await uploadDirectory('dist', 'pr${{ github.event.pull_request.number }}/packages/cherry-markdown/dist');
-                // await uploadDirectory('examples', 'pr${{ github.event.pull_request.number }}/examples');
+                await uploadDirectory('examples', 'pr${{ github.event.pull_request.number }}/examples');
                 // 列出examples中的所有文件
                 const files = fs.readdirSync('examples');
                 console.log(files);
