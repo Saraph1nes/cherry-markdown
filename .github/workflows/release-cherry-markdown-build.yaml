@@ -1,0 +1,30 @@
+name: "Build Cherry Markdown Release"
+
+on:
+  workflow_call:
+jobs:
+  release-cherry-markdown-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: |
+          yarn
+          yarn build
+
+      - name: Publish cherry-markdown
+        run: |
+          cp README*.md packages/cherry-markdown/
+           
+          cd packages/cherry-markdown
+          npm publish --access public
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
