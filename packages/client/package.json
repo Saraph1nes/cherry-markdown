@@ -15,6 +15,7 @@
     "@tauri-apps/plugin-opener": "2.2.0",
     "cherry-markdown": "*",
     "pinia": "^2.2.4",
+    "tdesign-vue-next": "^1.11.5",
     "vue": "^3.5.13",
     "vue-router": "4"
   },

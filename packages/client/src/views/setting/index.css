@@ -1,0 +1,17 @@
+.setting-container {
+  height: 100%;
+}
+
+.setting-aside {
+  border-right: 1px solid var(--td-component-stroke);
+}
+
+.setting-content {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.help-link {
+  margin-left: 8px;
+  font-size: 12px;
+} 

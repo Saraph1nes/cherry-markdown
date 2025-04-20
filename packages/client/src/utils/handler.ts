@@ -120,13 +120,13 @@ export const handleToggleToolbar = async (cherryMarkdown: Cherry) => {
 export const handleSettingMenu = () => {
   const window = new WebviewWindow('about', {
     url: '/setting',
-    width: 600,
-    height: 400,
+    width: 900,
+    height: 600,
     title: 'Setting',
-    resizable: false,
+    resizable: true,
     skipTaskbar: true,
     decorations: true,
-    center: false,
+    center: true,
     focus: true,
   });
   window.once('tauri://created', async () => {
