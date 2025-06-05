@@ -100,6 +100,14 @@ const options = {
       babelHelpers: 'runtime',
       exclude: [/node_modules[\\/](?!codemirror[\\/]src[\\/]|parse5|lodash-es|d3-.*[\\/]src|d3[\\/]src|dagre-d3-es)/],
     }),
+    // SSR环境判断
+    {
+      name: 'prepend-ssr-check',
+      renderChunk(code) {
+        const ssrCheckCode = `if(typeof window==='undefined'){console.error('Cherry Markdown 不支持在 SSR 环境中直接使用。请确保在客户端环境中初始化。');throw new Error('Cherry Markdown 不支持在 SSR 环境中直接使用。请确保在客户端环境中初始化。')}`;
+        return ssrCheckCode + code;
+      },
+    },
     // TODO: 重构抽出为独立的插件
     {
       name: 'dist-types',

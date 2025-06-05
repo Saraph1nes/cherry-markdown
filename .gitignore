@@ -29,3 +29,5 @@ packages/**/yarn.lock
 
 # config
 examples/cherry-markdown-publish/src/common/config/*.yaml
+
+playground/**
