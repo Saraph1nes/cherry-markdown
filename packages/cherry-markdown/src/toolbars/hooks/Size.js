@@ -86,7 +86,10 @@ export default class Size extends MenuBase {
     // 如果选中的内容里有字号语法，则直接去掉该语法
     if (!this.isSelections && !this.$testIsSize($selection)) {
       this.getMoreSelection('!32 ', '!', () => {
-        const newSelection = this.editor.editor.getSelection();
+        const newSelection = this.editor.editorView.state.sliceDoc(
+          this.editor.editorView.state.selection.main.from,
+          this.editor.editorView.state.selection.main.to,
+        );
         if (this.$testIsSize(newSelection)) {
           $selection = newSelection;
           return true;

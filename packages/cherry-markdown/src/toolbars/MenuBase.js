@@ -20,6 +20,24 @@ import { createElement } from '@/utils/dom';
 import NestedError from '@/utils/error';
 
 /**
+ * 获取单词的范围
+ * @param {string} text 文本内容
+ * @param {number} pos 位置
+ * @returns {{from: number, to: number}} 单词的起始和结束位置
+ */
+function getWordRange(text, pos) {
+  let from = pos;
+  let to = pos;
+  while (from > 0 && /\w/.test(text[from - 1])) {
+    from -= 1;
+  }
+  while (to < text.length && /\w/.test(text[to])) {
+    to += 1;
+  }
+  return { from, to };
+}
+
+/**
  * @typedef {Object} SubMenuConfigItem
  * @property {string} name - 子菜单项名称
  * @property {string=} iconName - 子菜单项图标名称
@@ -297,7 +315,12 @@ export default class MenuBase {
   fire(event, shortKey = '') {
     event?.stopPropagation();
     if (typeof this.onClick === 'function') {
-      const selections = this.editor.editor.getSelections();
+      const selections = [
+        this.editor.editorView.state.doc.sliceString(
+          this.editor.editorView.state.selection.main.from,
+          this.editor.editorView.state.selection.main.to,
+        ),
+      ];
       // 判断是不是多选
       this.isSelections = selections.length > 1;
       // 当onClick返回null、undefined、false时，维持原样
@@ -313,13 +336,13 @@ export default class MenuBase {
               const safeResults = resolvedResults.map((result, index) =>
                 result === undefined || result === null ? selections[index] : String(result),
               );
-              this.editor.editor.replaceSelections(safeResults, 'around');
+              this.editor.editorView.dispatch(this.editor.editorView.state.replaceSelection(safeResults[0]));
               this.editor.editor.focus();
               this.$afterClick();
             },
           );
         } else {
-          this.editor.editor.replaceSelections(results, 'around');
+          this.editor.editorView.dispatch(this.editor.editorView.state.replaceSelection(results[0]));
           this.editor.editor.focus();
           this.$afterClick();
         }
@@ -331,12 +354,19 @@ export default class MenuBase {
    * 获取当前选择区域的range
    */
   $getSelectionRange() {
-    const { anchor, head } = this.editor.editor.listSelections()[0];
+    const view = this.editor.editorView;
+    const { anchor, head } = view.state.selection.main;
+    const anchorLine = view.state.doc.lineAt(anchor);
+    const headLine = view.state.doc.lineAt(head);
+    const anchorCh = anchor - anchorLine.from;
+    const headCh = head - headLine.from;
+    const anchorPos = { line: anchorLine.number - 1, ch: anchorCh };
+    const headPos = { line: headLine.number - 1, ch: headCh };
     // 如果begin在end的后面
-    if ((anchor.line === head.line && anchor.ch > head.ch) || anchor.line > head.line) {
-      return { begin: head, end: anchor };
+    if ((anchorLine.number === headLine.number && anchorCh > headCh) || anchorLine.number > headLine.number) {
+      return { begin: headPos, end: anchorPos };
     }
-    return { begin: anchor, end: head };
+    return { begin: anchorPos, end: headPos };
   }
 
   /**
@@ -363,18 +393,31 @@ export default class MenuBase {
    * @param {String} lessAfter
    */
   setLessSelection(lessBefore, lessAfter) {
-    const cm = this.editor.editor;
+    const view = this.editor.editorView;
     const { begin, end } = this.$getSelectionRange();
     const newBeginLine = lessBefore.match(/\n/g)?.length > 0 ? begin.line + lessBefore.match(/\n/g).length : begin.line;
     const newBeginCh =
       lessBefore.match(/\n/g)?.length > 0
         ? lessBefore.replace(/^[\s\S]*?\n([^\n]*)$/, '$1').length
         : begin.ch + lessBefore.length;
-    const newBegin = { line: newBeginLine, ch: newBeginCh };
     const newEndLine = lessAfter.match(/\n/g)?.length > 0 ? end.line - lessAfter.match(/\n/g).length : end.line;
-    const newEndCh = lessAfter.match(/\n/g)?.length > 0 ? cm.getLine(newEndLine).length : end.ch - lessAfter.length;
-    const newEnd = { line: newEndLine, ch: newEndCh };
-    cm.setSelection(newBegin, newEnd);
+
+    // 获取新的开始位置
+    const startLine = view.state.doc.line(newBeginLine + 1);
+    const startPos = startLine.from + newBeginCh;
+
+    // 获取新的结束位置
+    const endLine = view.state.doc.line(newEndLine + 1);
+    const endCh = lessAfter.match(/\n/g)?.length > 0 ? endLine.length : end.ch - lessAfter.length;
+    const endPos = endLine.from + endCh;
+
+    // 更新选区
+    view.dispatch({
+      selection: {
+        anchor: startPos,
+        head: endPos,
+      },
+    });
   }
 
   /**
@@ -384,7 +427,7 @@ export default class MenuBase {
    * @param {function} [cb] 回调函数，如果返回false，则恢复原来的选取
    */
   getMoreSelection(appendBefore, appendAfter, cb) {
-    const cm = this.editor.editor;
+    const view = this.editor.editor;
     const { begin, end } = this.$getSelectionRange();
     let newBeginCh =
       // 如果只包含换行，则起始位置一定是0
@@ -392,22 +435,44 @@ export default class MenuBase {
     newBeginCh = newBeginCh < 0 ? 0 : newBeginCh;
     let newBeginLine = /\n/.test(appendBefore) ? begin.line - appendBefore.match(/\n/g).length : begin.line;
     newBeginLine = newBeginLine < 0 ? 0 : newBeginLine;
-    const newBegin = { line: newBeginLine, ch: newBeginCh };
+
+    // 获取新的开始位置
+    const startLine = view.state.doc.line(newBeginLine + 1);
+    const startPos = startLine.from + newBeginCh;
+
     let newEndLine = end.line;
     let newEndCh = end.ch;
     if (/\n/.test(appendAfter)) {
       newEndLine = end.line + appendAfter.match(/\n/g).length;
-      newEndCh = cm.getLine(newEndLine)?.length;
+      const endLine = view.state.doc.line(newEndLine + 1);
+      newEndCh = endLine.length;
     } else {
-      newEndCh =
-        cm.getLine(end.line).length < end.ch + appendAfter.length
-          ? cm.getLine(end.line).length
-          : end.ch + appendAfter.length;
+      const endLine = view.state.doc.line(end.line + 1);
+      newEndCh = Math.min(endLine.length, end.ch + appendAfter.length);
     }
-    const newEnd = { line: newEndLine, ch: newEndCh };
-    cm.setSelection(newBegin, newEnd);
+
+    // 获取新的结束位置
+    const endLine = view.state.doc.line(newEndLine + 1);
+    const endPos = endLine.from + newEndCh;
+
+    // 更新选区
+    view.dispatch({
+      selection: {
+        anchor: startPos,
+        head: endPos,
+      },
+    });
+
     if (cb() === false) {
-      cm.setSelection(begin, end);
+      // 恢复原来的选区
+      const origStartLine = view.state.doc.line(begin.line + 1);
+      const origEndLine = view.state.doc.line(end.line + 1);
+      view.dispatch({
+        selection: {
+          anchor: origStartLine.from + begin.ch,
+          head: origEndLine.from + end.ch,
+        },
+      });
     }
   }
 
@@ -430,14 +495,33 @@ export default class MenuBase {
     // 获取光标所在行的内容，同时选中所在行
     if (type === 'line') {
       const { begin, end } = this.$getSelectionRange();
-      cm.setSelection({ line: begin.line, ch: 0 }, { line: end.line, ch: cm.getLine(end.line).length });
-      return cm.getSelection();
+      const view = cm;
+      const startLine = view.state.doc.line(begin.line + 1);
+      const endLine = view.state.doc.line(end.line + 1);
+      view.dispatch({
+        selection: {
+          anchor: startLine.from,
+          head: endLine.to,
+        },
+      });
+      return view.state.sliceDoc(startLine.from, endLine.to);
     }
     // 获取光标所在单词的内容，同时选中所在单词
     if (type === 'word') {
-      const { anchor: begin, head: end } = cm.findWordAt(cm.getCursor());
-      cm.setSelection(begin, end);
-      return cm.getSelection();
+      const view = cm;
+      const pos = view.state.selection.main.head;
+      const line = view.state.doc.lineAt(pos);
+      const text = line.text;
+      const wordRange = getWordRange(text, pos - line.from);
+      const from = line.from + wordRange.from;
+      const to = line.from + wordRange.to;
+      view.dispatch({
+        selection: {
+          anchor: from,
+          head: to,
+        },
+      });
+      return view.state.sliceDoc(from, to);
     }
   }
 

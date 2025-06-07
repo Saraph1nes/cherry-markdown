@@ -45,6 +45,6 @@ export default class FullScreen extends MenuBase {
       cherryToolbarFullscreen && cherryToolbarFullscreen.appendChild(minScreen);
       cherryClass.add('fullscreen');
     }
-    this.editor.editor.refresh();
+    this.editor.editorView.requestMeasure();
   }
 }

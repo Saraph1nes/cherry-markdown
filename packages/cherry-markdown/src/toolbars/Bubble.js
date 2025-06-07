@@ -48,7 +48,9 @@ export default class Bubble extends Toolbar {
     this.bubbleDom = this.options.dom;
     this.editorDom = this.options.editor.getEditorDom();
     this.initBubbleDom();
-    this.editorDom.querySelector('.CodeMirror').appendChild(this.bubbleDom);
+    // 对于 CodeMirror 6，需要将气泡工具栏添加到编辑器的 DOM 容器中
+    const editorContainer = this.editorDom.querySelector('.cm-editor') || this.editorDom;
+    editorContainer.appendChild(this.bubbleDom);
     Object.entries(this.shortcutKeyMap).forEach(([key, value]) => {
       this.$cherry.toolbar.shortcutKeyMap[key] = value;
     });

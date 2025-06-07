@@ -21,9 +21,9 @@ var CustomHookA = Cherry.createSyntaxHook('codeBlock', Cherry.constants.HOOKS_TY
  * 点第一次时，把选中的文字变成同时加粗和斜体
  * 保持光标选区不变，点第二次时，把加粗斜体的文字变成普通文本
  */
-var customMenuA = Cherry.createMenuHook('加粗斜体',  {
+var customMenuA = Cherry.createMenuHook('加粗斜体', {
   iconName: 'font',
-  onClick: function(selection) {
+  onClick: function (selection) {
     // 获取用户选中的文字，调用getSelection方法后，如果用户没有选中任何文字，会尝试获取光标所在位置的单词或句子
     let $selection = this.getSelection(selection) || '同时加粗斜体';
     // 如果是单选，并且选中内容的开始结束内没有加粗语法，则扩大选中范围
@@ -50,25 +50,26 @@ var customMenuA = Cherry.createMenuHook('加粗斜体',  {
       this.setLessSelection('***', '***');
     });
     return $selection.replace(/(^)([^\n]+)($)/gm, '$1***$2***$3');
-  }
+  },
 });
 /**
  * 定义一个空壳，用于自行规划cherry已有工具栏的层级结构
  */
-var customMenuB = Cherry.createMenuHook('实验室',  {
+var customMenuB = Cherry.createMenuHook('实验室', {
   icon: {
     type: 'svg',
-    content: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></svg>',
+    content:
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></svg>',
     iconStyle: 'width: 15px; height: 15px; vertical-align: middle;',
   },
 });
 /**
  * 定义一个自带二级菜单的工具栏
  */
-var customMenuC = Cherry.createMenuHook('帮助中心',  {
+var customMenuC = Cherry.createMenuHook('帮助中心', {
   iconName: 'question',
   onClick: (selection, type) => {
-    switch(type) {
+    switch (type) {
       case 'shortKey':
         return `${selection}快捷键看这里：https://codemirror.net/5/demo/sublime.html`;
       case 'github':
@@ -80,21 +81,55 @@ var customMenuC = Cherry.createMenuHook('帮助中心',  {
     }
   },
   subMenuConfig: [
-    { noIcon: true, name: '快捷键', onclick: (event)=>{cherry.toolbar.menus.hooks.customMenuCName.fire(null, 'shortKey')} },
-    { noIcon: true, name: '联系我们', onclick: (event)=>{cherry.toolbar.menus.hooks.customMenuCName.fire(null, 'github')} },
-    { noIcon: true, name: '更新日志', onclick: (event)=>{cherry.toolbar.menus.hooks.customMenuCName.fire(null, 'release')} },
-  ]
+    {
+      noIcon: true,
+      name: '快捷键',
+      onclick: (event) => {
+        cherry.toolbar.menus.hooks.customMenuCName.fire(null, 'shortKey');
+      },
+    },
+    {
+      noIcon: true,
+      name: '联系我们',
+      onclick: (event) => {
+        cherry.toolbar.menus.hooks.customMenuCName.fire(null, 'github');
+      },
+    },
+    {
+      noIcon: true,
+      name: '更新日志',
+      onclick: (event) => {
+        cherry.toolbar.menus.hooks.customMenuCName.fire(null, 'release');
+      },
+    },
+  ],
 });
 
 /**
  * 定义带图表表格的按钮
  */
-var customMenuTable = Cherry.createMenuHook('图表',  {
+var customMenuTable = Cherry.createMenuHook('图表', {
   iconName: 'trendingUp',
   subMenuConfig: [
-    { noIcon: true, name: '折线图', onclick: (event)=>{cherry.insert('\n| :line:{x,y} | Header1 | Header2 | Header3 | Header4 |\n| ------ | ------ | ------ | ------ | ------ |\n| Sample1 | 11 | 11 | 4 | 33 |\n| Sample2 | 112 | 111 | 22 | 222 |\n| Sample3 | 333 | 142 | 311 | 11 |\n');} },
-    { noIcon: true, name: '柱状图', onclick: (event)=>{cherry.insert('\n| :bar:{x,y} | Header1 | Header2 | Header3 | Header4 |\n| ------ | ------ | ------ | ------ | ------ |\n| Sample1 | 11 | 11 | 4 | 33 |\n| Sample2 | 112 | 111 | 22 | 222 |\n| Sample3 | 333 | 142 | 311 | 11 |\n');} },
-  ]
+    {
+      noIcon: true,
+      name: '折线图',
+      onclick: (event) => {
+        cherry.insert(
+          '\n| :line:{x,y} | Header1 | Header2 | Header3 | Header4 |\n| ------ | ------ | ------ | ------ | ------ |\n| Sample1 | 11 | 11 | 4 | 33 |\n| Sample2 | 112 | 111 | 22 | 222 |\n| Sample3 | 333 | 142 | 311 | 11 |\n',
+        );
+      },
+    },
+    {
+      noIcon: true,
+      name: '柱状图',
+      onclick: (event) => {
+        cherry.insert(
+          '\n| :bar:{x,y} | Header1 | Header2 | Header3 | Header4 |\n| ------ | ------ | ------ | ------ | ------ |\n| Sample1 | 11 | 11 | 4 | 33 |\n| Sample2 | 112 | 111 | 22 | 222 |\n| Sample3 | 333 | 142 | 311 | 11 |\n',
+        );
+      },
+    },
+  ],
 });
 
 var basicConfig = {
@@ -137,8 +172,20 @@ var basicConfig = {
         editCode: true,
         changeLang: true,
         customBtns: [
-          { html: '自定义按钮1', onClick: (event, code, lang, dom)=>{console.log(`【${lang}】: ${code}`);console.log(dom);} },
-          { html: '自定义按钮2', onClick: (event, code, lang, dom)=>{console.log(`【${lang}】: ${code}`);console.log(dom);} },
+          {
+            html: '自定义按钮1',
+            onClick: (event, code, lang, dom) => {
+              console.log(`【${lang}】: ${code}`);
+              console.log(dom);
+            },
+          },
+          {
+            html: '自定义按钮2',
+            onClick: (event, code, lang, dom) => {
+              console.log(`【${lang}】: ${code}`);
+              console.log(dom);
+            },
+          },
         ],
       },
       table: {
@@ -171,7 +218,7 @@ var basicConfig = {
       // 'header': {
       //   strict: false
       // }
-      
+
       panel: {
         // 是否支持对齐语法
         enableJustify: true,
@@ -267,7 +314,22 @@ var basicConfig = {
       '|',
       'formula',
       {
-        insert: ['image', 'audio', 'video', 'link', 'hr', 'br', 'code', 'inlineCode', 'formula', 'toc', 'table', 'pdf', 'word', 'file'],
+        insert: [
+          'image',
+          'audio',
+          'video',
+          'link',
+          'hr',
+          'br',
+          'code',
+          'inlineCode',
+          'formula',
+          'toc',
+          'table',
+          'pdf',
+          'word',
+          'file',
+        ],
       },
       'graph',
       'customMenuTable',
@@ -333,7 +395,7 @@ var basicConfig = {
   callback: {
     changeString2Pinyin: pinyin,
     onClickPreview: (event) => {
-      console.log("onClickPreview", event);
+      console.log('onClickPreview', event);
     },
   },
   editor: {
@@ -343,6 +405,10 @@ var basicConfig = {
     defaultModel: 'edit&preview',
     showFullWidthMark: true, // 是否高亮全角符号 ·|￥|、|：|“|”|【|】|（|）|《|》
     showSuggestList: true, // 是否显示联想框
+    codemirror: {
+      // 是否自动focus 默认为true
+      autofocus: true,
+    },
   },
   // cherry初始化后是否检查 location.hash 尝试滚动到对应位置
   autoScrollByHashAfterInit: true,
@@ -352,7 +418,9 @@ var basicConfig = {
   },
 };
 
-fetch('./assets/markdown/basic.md').then((response) => response.text()).then((value) => {
-  var config = Object.assign({}, basicConfig, { value: value });
-  window.cherry = new Cherry(config);
-});
+fetch('./assets/markdown/basic.md')
+  .then((response) => response.text())
+  .then((value) => {
+    var config = Object.assign({}, basicConfig, { value: value });
+    window.cherry = new Cherry(config);
+  });

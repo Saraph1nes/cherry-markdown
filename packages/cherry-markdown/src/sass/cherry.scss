@@ -417,6 +417,7 @@
   width: 50%;
   box-sizing: border-box;
   overflow: hidden;
+  height: 100%;
 
   &.cherry-editor--full {
     width: 100%;
@@ -451,7 +452,20 @@
       }
     }
     &--typewriter {
+      // CodeMirror 5 支持
       .CodeMirror-lines {
+        position: relative;
+        &::before {
+          content: '';
+          display: block;
+        }
+        &::after {
+          content: '';
+          display: block;
+        }
+      }
+      // CodeMirror 6 支持
+      .cm-content {
         position: relative;
         &::before {
           content: '';
@@ -465,6 +479,7 @@
     }
   }
 
+  // CodeMirror 5 样式
   .CodeMirror {
     font-family: $fontFamily;
     background: $editorBg;
@@ -495,53 +510,97 @@
     }
   }
 
-  .cm-s-default .cm-header {
+  // CodeMirror 6 样式
+  .cm-editor {
+    font-family: $fontFamily;
+    background: $editorBg;
+    color: $fontColor;
+    height: 100%;
+  }
+
+  .cm-content {
+    padding: 15px 34px;
+    min-height: 100%;
+
+    // 对draw.io的xml数据，和图片里base64格式的数据限定最大宽度
+    .long-text,
+    .drawio,
+    .base64 {
+      display: inline-block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 80px;
+      white-space: nowrap;
+      vertical-align: bottom;
+      color: darkmagenta !important;
+      font-size: 12px !important;
+    }
+  }
+
+  .cm-scroller {
+    height: 100%;
+    overflow: auto !important;
+  }
+
+  // CodeMirror 5 和 6 通用样式
+  .cm-s-default .cm-header,
+  .cm-header {
     color: $editorHeaderColor;
   }
 
-  .cm-s-default .cm-string {
+  .cm-s-default .cm-string,
+  .cm-string {
     color: $editorStringColor;
   }
 
-  .cm-s-default .cm-comment {
+  .cm-s-default .cm-comment,
+  .cm-comment {
     color: $editorCommentColor;
     font-family: $monospaceFont;
     font-size: 0.9em;
   }
 
   .cm-s-default .cm-whitespace,
-  .cm-tab {
+  .cm-tab,
+  .cm-whitespace {
     font-family: $monospaceFont;
     font-size: 0.9em;
   }
 
-  .cm-s-default .cm-quote {
+  .cm-s-default .cm-quote,
+  .cm-quote {
     color: $editorQuoteColor;
   }
 
-  .cm-s-default .cm-link {
+  .cm-s-default .cm-link,
+  .cm-link {
     color: $editorLinkColor;
   }
 
-  .cm-s-default .cm-url {
+  .cm-s-default .cm-url,
+  .cm-url {
     background: $editorUrlBgColor;
     font-family: $monospaceFont;
     font-size: 0.9em;
   }
 
-  .cm-s-default .cm-variable-2 {
+  .cm-s-default .cm-variable-2,
+  .cm-variable-2 {
     color: $editorV2Color;
   }
 
-  .cm-s-default .cm-variable-3 {
+  .cm-s-default .cm-variable-3,
+  .cm-variable-3 {
     color: $editorV3Color;
   }
 
-  .cm-s-default .cm-keyword {
+  .cm-s-default .cm-keyword,
+  .cm-keyword {
     color: $editorKeywordColor;
   }
 
-  .cm-s-default .cm-fullWidth {
+  .cm-s-default .cm-fullWidth,
+  .cm-fullWidth {
     color: $fullWidthColor;
     z-index: 3;
     cursor: pointer;
@@ -554,11 +613,15 @@
   position: absolute;
   z-index: 12;
   background: transparent;
+  top: 0;
+  bottom: 0;
+  right: -7.5px;
 
   &.cherry-drag--show {
     width: 5px;
     display: block;
     background: #dfe6ee;
+    right: -2.5px;
   }
 
   &.cherry-drag--hidden {
@@ -593,7 +656,7 @@
   z-index: 1;
 }
 
-.cherry-mask-code-block{
+.cherry-mask-code-block {
   width: 100%;
   padding-top: 50px;
   display: none;
@@ -624,8 +687,7 @@
   }
 }
 
-
-.cherry-code-unExpand{
+.cherry-code-unExpand {
   pre {
     height: 240px;
     overflow: hidden !important;
@@ -665,7 +727,7 @@
   .cherry-code-block-custom-btn {
     width: auto;
   }
-  .cherry-expand-code-block{
+  .cherry-expand-code-block {
     position: absolute;
     width: 25px;
     text-align: center;
@@ -683,9 +745,9 @@
   }
   .cherry-expand-code-block {
     top: 45px;
-    right:10px;
+    right: 10px;
   }
-  .cherry-unExpand-code-block{
+  .cherry-unExpand-code-block {
     z-index: 12;
     &.hidden {
       display: none;
@@ -718,16 +780,16 @@
   min-width: 430px;
   min-height: 300px;
 
-  &.float-previewer-dragging{
+  &.float-previewer-dragging {
     box-shadow: 0 0 60px rgba(0, 0, 0, 0.3);
 
-    .float-previewer-header{
+    .float-previewer-header {
       cursor: grabbing;
       background: #ace4ff;
     }
   }
 
-  .float-previewer-header{
+  .float-previewer-header {
     z-index: 999999;
     height: 40px;
     border-bottom: 1px solid #ebedee;
@@ -738,7 +800,7 @@
     padding: 0 20px;
     cursor: grab;
 
-    .float-previewer-title{
+    .float-previewer-title {
       user-select: none;
       font-size: 16px;
       color: #333;
@@ -746,7 +808,7 @@
     }
   }
 
-  .cherry-previewer{
+  .cherry-previewer {
     border-left: none;
   }
 }
@@ -787,7 +849,7 @@
   .cherry-list__lower-greek {
     list-style: lower-greek;
   }
-  
+
   .cherry-list__lower-alpha {
     list-style: lower-alpha;
   }

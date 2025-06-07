@@ -232,7 +232,7 @@ export default class TableHandler {
    */
   $setSelection(index, type = 'table', select = true) {
     const tableCode = this.tableEditor.tableCodes[index];
-    const whole = this.codeMirror.getValue();
+    const whole = this.codeMirror.editorView.state.doc.toString();
     const selectTdInfo = this.tableEditor.info;
     const beginLine = whole.slice(0, tableCode.offset).match(/\n/g)?.length ?? 0;
     const { preLine, preCh, plusCh, currentTd } = this.$getTdOffset(

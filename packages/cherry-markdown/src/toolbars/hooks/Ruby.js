@@ -39,7 +39,10 @@ export default class Ruby extends MenuBase {
     // 如果选中的文本中已经有ruby语法了，则去掉该语法
     if (!this.isSelections && !this.$testIsRuby($selection)) {
       this.getMoreSelection(' { ', ' } ', () => {
-        const newSelection = this.editor.editor.getSelection();
+        const newSelection = this.editor.editorView.state.sliceDoc(
+          this.editor.editorView.state.selection.main.from,
+          this.editor.editorView.state.selection.main.to,
+        );
         const isRuby = this.$testIsRuby(newSelection);
         if (isRuby) {
           $selection = newSelection;

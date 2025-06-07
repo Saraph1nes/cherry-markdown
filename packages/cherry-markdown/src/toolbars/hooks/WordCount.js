@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 import MenuBase from '@/toolbars/MenuBase';
+import { StateEffect } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
 /**
  * 字数统计
  */
@@ -60,15 +62,21 @@ export default class wordCount extends MenuBase {
 
       // 编辑区修改时延时触发字数统计，防止过于频繁
       let timeout = null;
-      this.editor.editor.on('change', () => {
-        if (timeout) {
-          clearTimeout(timeout);
-        }
 
-        timeout = setTimeout(() => {
-          span.dispatchEvent(this.countEvent);
-          timeout = null;
-        }, 500);
+      const updateListener = EditorView.updateListener.of((update) => {
+        if (update.docChanged) {
+          if (timeout) {
+            clearTimeout(timeout);
+          }
+          timeout = setTimeout(() => {
+            span.dispatchEvent(this.countEvent);
+            timeout = null;
+          }, 500);
+        }
+      });
+
+      this.editor.editorView.dispatch({
+        effects: StateEffect.appendConfig.of(updateListener),
       });
     }
     // 循环切换4种状态

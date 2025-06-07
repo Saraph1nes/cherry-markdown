@@ -39,7 +39,10 @@ export default class Sup extends MenuBase {
     // 如果选中的内容里有上标的语法，则认为是要去掉上标语法
     if (!this.isSelections && !this.$testIsSup($selection)) {
       this.getMoreSelection('^', '^', () => {
-        const newSelection = this.editor.editor.getSelection();
+        const newSelection = this.editor.editorView.state.sliceDoc(
+          this.editor.editorView.state.selection.main.from,
+          this.editor.editorView.state.selection.main.to,
+        );
         const isSup = this.$testIsSup(newSelection);
         if (isSup) {
           $selection = newSelection;

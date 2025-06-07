@@ -53,7 +53,10 @@ export default class Italic extends MenuBase {
     // 如果是单选，并且选中内容的开始结束内没有加粗语法，则扩大选中范围
     if (!this.isSelections && !this.$testIsItalic($selection)) {
       this.getMoreSelection('*', '*', () => {
-        const newSelection = this.editor.editor.getSelection();
+        const newSelection = this.editor.editorView.state.sliceDoc(
+          this.editor.editorView.state.selection.main.from,
+          this.editor.editorView.state.selection.main.to,
+        );
         const isItalic = this.$testIsItalic(newSelection);
         if (isItalic) {
           $selection = newSelection;

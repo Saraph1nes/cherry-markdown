@@ -39,7 +39,10 @@ export default class Sub extends MenuBase {
     // 如果选中的内容里有下标的语法，则认为是要去掉下标语法
     if (!this.isSelections && !this.$testIsSub($selection)) {
       this.getMoreSelection('^^', '^^', () => {
-        const newSelection = this.editor.editor.getSelection();
+        const newSelection = this.editor.editorView.state.sliceDoc(
+          this.editor.editorView.state.selection.main.from,
+          this.editor.editorView.state.selection.main.to,
+        );
         const isSub = this.$testIsSub(newSelection);
         if (isSub) {
           $selection = newSelection;

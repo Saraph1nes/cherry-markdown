@@ -38,7 +38,10 @@ export default class Detail extends MenuBase {
     if (!this.detailRule.test($selection)) {
       // 如果没有命中手风琴语法，则尝试扩大选区
       this.getMoreSelection('+++ ', '\n', () => {
-        const newSelection = this.editor.editor.getSelection();
+        const newSelection = this.editor.editorView.state.sliceDoc(
+          this.editor.editorView.state.selection.main.from,
+          this.editor.editorView.state.selection.main.to,
+        );
         this.detailRule.lastIndex = 0;
         const isMatch = this.detailRule.test(newSelection);
         if (isMatch !== false) {

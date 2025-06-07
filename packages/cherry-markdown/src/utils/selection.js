@@ -16,7 +16,7 @@
 
 /**
  * 获取用户选中的文本内容，如果没有选中文本，则返回光标所在的位置的内容
- * @param {Object} cm Codemirror实例
+ * @param {import('@codemirror/view').EditorView} cm EditorView实例
  * @param {string} selection 当前选中的文本内容
  * @param {string} type  'line': 当没有选择文本时，获取光标所在行的内容； 'word': 当没有选择文本时，获取光标所在单词的内容
  * @param {boolean} focus true；强行选中光标处的内容，否则只获取选中的内容
@@ -24,7 +24,7 @@
  */
 export function getSelection(cm, selection, type = 'word', focus = false) {
   // 多光标模式下不做处理
-  if (cm.getSelections().length > 1) {
+  if (cm.state.selection.ranges.length > 1) {
     return selection;
   }
   if (selection && !focus) {
@@ -32,19 +32,54 @@ export function getSelection(cm, selection, type = 'word', focus = false) {
   }
   // 获取光标所在行的内容，同时选中所在行
   if (type === 'line') {
-    const { anchor, head } = cm.listSelections()[0];
-    // 如果begin在end的后面
-    if ((anchor.line === head.line && anchor.ch > head.ch) || anchor.line > head.line) {
-      cm.setSelection({ line: head.line, ch: 0 }, { line: anchor.line, ch: cm.getLine(anchor.line).length });
-    } else {
-      cm.setSelection({ line: anchor.line, ch: 0 }, { line: head.line, ch: cm.getLine(head.line).length });
-    }
-    return cm.getSelection();
+    const selection = cm.state.selection.main;
+    const lineStart = cm.state.doc.lineAt(selection.from);
+    const lineEnd = cm.state.doc.lineAt(selection.to);
+
+    // 如果开始位置在结束位置后面,交换它们
+    const from = selection.from > selection.to ? selection.to : selection.from;
+    const to = selection.from > selection.to ? selection.from : selection.to;
+
+    const startPos = lineStart.from;
+    const endPos = lineEnd.to;
+
+    cm.dispatch({
+      selection: {
+        anchor: startPos,
+        head: endPos,
+      },
+    });
+
+    return cm.state.sliceDoc(startPos, endPos);
   }
+
   // 获取光标所在单词的内容，同时选中所在单词
   if (type === 'word') {
-    const { anchor: begin, head: end } = cm.findWordAt(cm.getCursor());
-    cm.setSelection(begin, end);
-    return cm.getSelection();
+    const pos = cm.state.selection.main.head;
+    const line = cm.state.doc.lineAt(pos);
+    const lineText = line.text;
+
+    // 简单的单词边界检测
+    let start = pos - line.from;
+    let end = start;
+
+    while (start > 0 && /\w/.test(lineText[start - 1])) {
+      start = start - 1;
+    }
+    while (end < lineText.length && /\w/.test(lineText[end])) {
+      end = end + 1;
+    }
+
+    const from = line.from + start;
+    const to = line.from + end;
+
+    cm.dispatch({
+      selection: {
+        anchor: from,
+        head: to,
+      },
+    });
+
+    return cm.state.sliceDoc(from, to);
   }
 }

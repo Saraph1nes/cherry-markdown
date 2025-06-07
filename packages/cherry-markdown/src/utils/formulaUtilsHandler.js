@@ -133,8 +133,10 @@ export default class FormulaHandler {
 
   collectFormulaCode() {
     const formulaCode = [];
-    // @ts-ignore
-    this.editor.editor.getValue().replace(/(\$+)\s*([\w\W]*?)\s*(\1)/g, (whole, start, content, end, offset) => {
+    const view = this.editor.editorView;
+    if (!view) return;
+    const text = view.state.doc.toString();
+    text.replace(/(\$+)\s*([\w\W]*?)\s*(\1)/g, (whole, start, content, end, offset) => {
       formulaCode.push({
         code: content,
         offset,

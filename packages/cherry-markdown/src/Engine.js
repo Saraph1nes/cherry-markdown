@@ -73,7 +73,7 @@ export default class Engine {
     this.timer = setTimeout(() => {
       this.$cherry.lastMarkdownText = '';
       this.hashCache = {};
-      const markdownText = this.$cherry.editor.editor.getValue();
+      const markdownText = this.$cherry.editor.editorView.state.doc.toString();
       const html = this.makeHtml(markdownText);
       this.$cherry.previewer.refresh(html);
       this.$cherry.$event.emit('afterChange', {
@@ -254,37 +254,34 @@ export default class Engine {
     if (!this.hooks && !this.hooks[type] && !this.hooks[type][method]) {
       return $md;
     }
-    try {
-      let canContinue = true;
-      $md = this.hooks[type][method]((newMd, oneHook) => {
-        if (!canContinue) {
-          return newMd;
-        }
-        if (!oneHook.$engine) {
-          oneHook.$engine = this;
-          // Deprecated
-          Object.defineProperty(oneHook, '_engine', {
-            get() {
-              Logger.warn('`this._engine` is deprecated. Use `this.$engine` instead.');
-              return this.$engine;
-            },
-          });
-        }
 
-        if (!oneHook[action]) {
-          return newMd;
+    let canContinue = true;
+    $md = this.hooks[type][method]((newMd, oneHook) => {
+      if (!canContinue) {
+        return newMd;
+      }
+      if (!oneHook.$engine) {
+        oneHook.$engine = this;
+        // Deprecated
+        Object.defineProperty(oneHook, '_engine', {
+          get() {
+            Logger.warn('`this._engine` is deprecated. Use `this.$engine` instead.');
+            return this.$engine;
+          },
+        });
+      }
+
+      if (!oneHook[action]) {
+        return newMd;
+      }
+      // 特殊处理：引用语法在实现嵌套引用时，需要将引用语法之前的语法进行执行，但不需要执行引用语法之后的语法
+      if (before && type === 'paragraph' && action === 'afterMakeHtml') {
+        if (oneHook.getName() === before) {
+          canContinue = false;
         }
-        // 特殊处理：引用语法在实现嵌套引用时，需要将引用语法之前的语法进行执行，但不需要执行引用语法之后的语法
-        if (before && type === 'paragraph' && action === 'afterMakeHtml') {
-          if (oneHook.getName() === before) {
-            canContinue = false;
-          }
-        }
-        return oneHook[action](newMd, actionArgs, this.markdownParams);
-      }, $md);
-    } catch (e) {
-      throw new NestedError(e);
-    }
+      }
+      return oneHook[action](newMd, actionArgs, this.markdownParams);
+    }, $md);
     return $md;
   }
 

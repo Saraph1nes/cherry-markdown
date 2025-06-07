@@ -1,4 +1,5 @@
-import { mac } from 'codemirror/src/util/browser';
+// 原生检测Mac平台
+const mac = typeof navigator !== 'undefined' ? /Mac/.test(navigator.platform) : false;
 
 export const SHIFT_KEY = 'Shift';
 export const ALT_KEY = 'Alt';

@@ -14,25 +14,14 @@
  * limitations under the License.
  */
 // @ts-check
-import codemirror from 'codemirror';
-// import 'codemirror/mode/markdown/markdown';
-import 'codemirror/mode/gfm/gfm'; // https://codemirror.net/mode/gfm/index.html
-import 'codemirror/mode/yaml-frontmatter/yaml-frontmatter'; // https://codemirror.net/5/mode/yaml-frontmatter/index.html
-// import 'codemirror/mode/xml/xml';
-import 'codemirror/addon/edit/continuelist';
-import 'codemirror/addon/edit/closetag';
-import 'codemirror/addon/fold/xml-fold';
-import 'codemirror/addon/edit/matchtags';
-import 'codemirror/addon/display/placeholder';
-import 'codemirror/keymap/sublime';
-import 'codemirror/keymap/vim';
+import { EditorState, EditorSelection } from '@codemirror/state';
+import { EditorView, keymap, lineNumbers, ViewPlugin, Decoration, WidgetType } from '@codemirror/view';
+import { defaultKeymap, indentWithTab } from '@codemirror/commands';
+import { markdown } from '@codemirror/lang-markdown';
+import { searchKeymap, search, highlightSelectionMatches } from '@codemirror/search';
+import { autocompletion, completionKeymap } from '@codemirror/autocomplete';
+import { bracketMatching } from '@codemirror/language';
 
-// import 'cm-search-replace/src/search';
-import 'codemirror/addon/search/searchcursor';
-import 'codemirror/addon/scroll/annotatescrollbar';
-import 'codemirror/addon/search/matchesonscrollbar';
-// import 'codemirror/addon/selection/active-line';
-// import 'codemirror/addon/edit/matchbrackets';
 import htmlParser from '@/utils/htmlparser';
 import pasteHelper from '@/utils/pasteHelper';
 import { addEvent } from './utils/event';
@@ -45,7 +34,6 @@ import { handleNewlineIndentList } from './utils/autoindent';
 /**
  * @typedef {import('~types/editor').EditorConfiguration} EditorConfiguration
  * @typedef {import('~types/editor').EditorEventCallback} EditorEventCallback
- * @typedef {import('codemirror')} CodeMirror
  */
 
 /** @type {import('~types/editor')} */
@@ -75,29 +63,12 @@ export default class Editor {
         cursorHeight: 0.85, // 光标高度，0.85好看一些
         indentUnit: 4, // 缩进单位为4
         tabSize: 4, // 一个tab转换成的空格数量
-        // styleActiveLine: false, // 当前行背景高亮
-        // matchBrackets: true, // 括号匹配
-        // mode: 'gfm', // 从markdown模式改成gfm模式，以使用默认高亮规则
-        mode: {
-          name: 'yaml-frontmatter', // yaml-frontmatter在gfm的基础上增加了对yaml的支持
-          base: {
-            name: 'gfm',
-            gitHubSpice: false, // 修复github风格的markdown语法高亮，见[issue#925](https://github.com/Tencent/cherry-markdown/issues/925)
-          },
-        },
         lineWrapping: true, // 自动换行
         indentWithTabs: true, // 缩进用tab表示
         autofocus: true,
         theme: 'default',
         autoCloseTags: true, // 输入html标签时自动补充闭合标签
-        extraKeys: {
-          Enter: handleNewlineIndentList,
-        }, // 增加markdown回车自动补全
-        matchTags: { bothTags: true }, // 自动高亮选中的闭合html标签
         placeholder: '',
-        // 设置为 contenteditable 对输入法定位更友好
-        // 但已知会影响某些悬浮菜单的定位，如粘贴选择文本或markdown模式的菜单
-        // inputStyle: 'contenteditable',
         keyMap: 'sublime',
       },
       toolbars: {},
@@ -121,8 +92,14 @@ export default class Editor {
     }
     Object.assign(this.options, restOptions);
     this.options.codemirror.keyMap = this.options.keyMap;
+
     this.$cherry = this.options.$cherry;
     this.instanceId = this.$cherry.getInstanceId();
+
+    // Initialize CodeMirror 6 editor state and view
+    this.editorView = null;
+    this.editorState = null;
+    this.decorationCache = new Map();
   }
 
   /**
@@ -130,11 +107,8 @@ export default class Editor {
    * @param {boolean} disable 是否禁用快捷键
    */
   disableShortcut = (disable = true) => {
-    if (disable) {
-      this.editor.setOption('keyMap', 'default');
-    } else {
-      this.editor.setOption('keyMap', this.options.keyMap);
-    }
+    // TODO: Implement for CodeMirror 6
+    // 在 CodeMirror 6 中需要通过重新配置扩展来实现
   };
 
   /**
@@ -144,11 +118,6 @@ export default class Editor {
   dealSpecialWords = () => {
     /**
      * 如果编辑器隐藏了，则不再处理（否则有性能问题）
-     * - 性能问题出现的原因：
-     *  1. 纯预览模式下，cherry的高度可能会被设置成auto（也就是没有滚动条）
-     *  2. 这时候codemirror的高度也是auto，其“视窗懒加载”提升性能的手段就失效了
-     *  3. 这时再大量的调用markText等api就会非常耗时
-     * - 经过上述分析，最好的判断应该是判断**编辑器高度是否为auto**，但考虑到一般只有纯预览模式才大概率设置成auto，所以就只判断纯预览模式了
      */
     if (this.$cherry.status.editor === 'hide') {
       return;
@@ -161,158 +130,169 @@ export default class Editor {
 
   /**
    * 把大字符串变成省略号
-   * @param {*} reg 正则
-   * @param {*} className 利用codemirror的MarkText生成的新元素的class
+   * @param {RegExp} reg 正则
+   * @param {string} className 利用codemirror的MarkText生成的新元素的class
    */
   formatBigData2Mark = (reg, className) => {
-    const codemirror = this.editor;
-    const searcher = codemirror.getSearchCursor(reg);
+    const view = this.editorView;
+    if (!view) return;
 
-    let oneSearch = searcher.findNext();
-    for (; oneSearch !== false; oneSearch = searcher.findNext()) {
-      const target = searcher.from();
-      if (!target) {
-        continue;
-      }
-      const bigString = oneSearch[2] ?? '';
-      const targetChFrom = target.ch + oneSearch[1]?.length;
-      const targetChTo = targetChFrom + bigString.length;
-      const targetLine = target.line;
-      const begin = { line: targetLine, ch: targetChFrom };
-      const end = { line: targetLine, ch: targetChTo };
-      // 如果所在区域已经有mark了，则不再增加mark
-      if (codemirror.findMarks(begin, end).length > 0) {
-        continue;
-      }
-      const newSpan = createElement('span', `cm-string ${className}`, { title: bigString });
-      newSpan.textContent = bigString;
-      codemirror.markText(begin, end, { replacedWith: newSpan, atomic: true });
+    const text = view.state.doc.toString();
+    const decorations = [];
+
+    let match;
+    while ((match = reg.exec(text)) !== null) {
+      const from = match.index + (match[1]?.length || 0);
+      const to = from + (match[2]?.length || 0);
+
+      const newSpan = createElement('span', `cm-string ${className}`, { title: match[2] || '' });
+      newSpan.textContent = match[2] || '';
+
+      decorations.push(
+        Decoration.replace({
+          widget: new (class extends WidgetType {
+            toDOM() {
+              return newSpan;
+            }
+          })(),
+        }).range(from, to),
+      );
     }
+
+    // 应用装饰
+    this.applyDecorations(decorations);
   };
 
   /**
-   * 高亮全角符号 ·|￥|、|：|“|”|【|】|（|）|《|》
+   * 高亮全角符号 ·|￥|、|：|"|"|【|】|（|）|《|》
    * full width翻译为全角
    */
   formatFullWidthMark() {
     if (!this.options.showFullWidthMark) {
       return;
     }
-    const { editor } = this;
-    const regex = /[·￥、：“”【】（）《》]/; // 此处以仅匹配单个全角符号
-    const searcher = editor.getSearchCursor(regex);
-    let oneSearch = searcher.findNext();
-    // 防止出现错误的mark
-    editor.getAllMarks().forEach(function (mark) {
-      if (mark.className === 'cm-fullWidth') {
-        const range = JSON.parse(JSON.stringify(mark.find()));
-        const markedText = editor.getRange(range.from, range.to);
-        if (!regex.test(markedText)) {
-          mark.clear();
-        }
-      }
-    });
-    for (; oneSearch !== false; oneSearch = searcher.findNext()) {
-      const target = searcher.from();
-      if (!target) {
-        continue;
-      }
-      const from = { line: target.line, ch: target.ch };
-      const to = { line: target.line, ch: target.ch + 1 };
-      // 当没有标记时再进行标记，判断textMaker的className必须为"cm-fullWidth"，
-      // 因为cm的addon里会引入className: "CodeMirror-composing"的textMaker干扰判断
-      const existMarksLength = editor.findMarks(from, to).filter((item) => {
-        return item.className === 'cm-fullWidth';
-      });
-      if (existMarksLength.length === 0) {
-        editor.markText(from, to, {
-          className: 'cm-fullWidth',
-          title: '按住Ctrl/Cmd点击切换成半角（Hold down Ctrl/Cmd and click to switch to half-width）',
-        });
-      }
+
+    const view = this.editorView;
+    if (!view) return;
+
+    const text = view.state.doc.toString();
+    const regex = /[·￥、：""【】（）《》]/g;
+    const decorations = [];
+
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      decorations.push(
+        Decoration.mark({
+          class: 'cm-fullWidth',
+          attributes: {
+            title: '按住Ctrl/Cmd点击切换成半角（Hold down Ctrl/Cmd and click to switch to half-width）',
+          },
+        }).range(match.index, match.index + 1),
+      );
     }
+
+    this.applyDecorations(decorations);
   }
 
   /**
-   *
-   * @param {CodeMirror.Editor} codemirror
+   * 应用装饰到编辑器
+   * @param {Array} decorations
+   */
+  applyDecorations(decorations) {
+    if (!this.editorView) return;
+
+    // CodeMirror 6 中装饰的应用方式不同，这里暂时注释掉
+    // 需要实现一个完整的装饰系统
+    // const decorationSet = Decoration.set(decorations.sort((a, b) => a.from - b.from));
+  }
+
+  /**
+   * 处理全角转半角
    * @param {MouseEvent} evt
    */
-  toHalfWidth(codemirror, evt) {
+  toHalfWidth(evt) {
     const { target } = evt;
     if (!(target instanceof HTMLElement)) {
       return;
     }
     // 针对windows用户为Ctrl按键，Mac用户为Cmd按键
     if (target.classList.contains('cm-fullWidth') && (evt.ctrlKey || evt.metaKey) && evt.buttons === 1) {
-      const rect = target.getBoundingClientRect();
-      // 由于是一个字符，所以肯定在一行
-      const from = codemirror.coordsChar({ left: rect.left, top: rect.top });
-      const to = { line: from.line, ch: from.ch + 1 };
-      codemirror.setSelection(from, to);
-      codemirror.replaceSelection(
-        target.innerText
+      const view = this.editorView;
+      if (!view) return;
+
+      // 获取点击位置的字符位置
+      const pos = view.posAtCoords({ x: evt.clientX, y: evt.clientY });
+      if (pos !== null) {
+        const char = view.state.doc.sliceString(pos, pos + 1);
+        const replacement = char
           .replace('·', '`')
           .replace('￥', '$')
           .replace('、', '/')
           .replace('：', ':')
-          .replace('“', '"')
-          .replace('”', '"')
+          .replace('"', '"')
+          .replace('"', '"')
           .replace('【', '[')
           .replace('】', ']')
           .replace('（', '(')
           .replace('）', ')')
           .replace('《', '<')
-          .replace('》', '>'),
-      );
+          .replace('》', '>');
+
+        view.dispatch({
+          changes: { from: pos, to: pos + 1, insert: replacement },
+        });
+      }
     }
   }
+
   /**
-   *
+   * 处理按键事件
    * @param {KeyboardEvent} e
-   * @param {CodeMirror.Editor} codemirror
    */
-  onKeyup = (e, codemirror) => {
-    const { line: targetLine } = codemirror.getCursor();
-    this.previewer.highlightLine(targetLine + 1);
+  onKeyup = (e) => {
+    const view = this.editorView;
+    if (!view) return;
+
+    const pos = view.state.selection.main.head;
+    const line = view.state.doc.lineAt(pos);
+    this.previewer.highlightLine(line.number);
   };
 
   /**
-   *
+   * 处理粘贴事件
    * @param {ClipboardEvent} e
-   * @param {CodeMirror.Editor} codemirror
    */
-  onPaste(e, codemirror) {
+  onPaste(e) {
     let { clipboardData } = e;
     if (clipboardData) {
-      this.handlePaste(e, clipboardData, codemirror);
+      this.handlePaste(e, clipboardData);
     } else {
       ({ clipboardData } = window);
-      this.handlePaste(e, clipboardData, codemirror);
+      this.handlePaste(e, clipboardData);
     }
   }
 
   /**
-   *
+   * 处理粘贴逻辑
    * @param {ClipboardEvent} event
    * @param {ClipboardEvent['clipboardData']} clipboardData
-   * @param {CodeMirror.Editor} codemirror
    * @returns {boolean | void}
    */
-  handlePaste(event, clipboardData, codemirror) {
+  handlePaste(event, clipboardData) {
     const onPasteRet = this.$cherry.options.callback.onPaste(clipboardData, this.$cherry);
     if (onPasteRet !== false && typeof onPasteRet === 'string') {
       event.preventDefault();
-      codemirror.replaceSelection(onPasteRet);
+      this.replaceSelection(onPasteRet);
       return;
     }
+
     let html = clipboardData.getData('Text/Html');
     const { items } = clipboardData;
     // 清空注释
     html = html.replace(/<!--[^>]+>/g, '');
+
     /**
-     * 处理“右键复制图片”场景
-     * 在这种场景下，我们希望粘贴进来的图片可以走文件上传逻辑，所以当检测到这种场景后，我们会清空html
+     * 处理"右键复制图片"场景
      */
     if (
       /<body>\s*<img [^>]+>\s*<\/body>/.test(html) &&
@@ -321,9 +301,9 @@ export default class Editor {
     ) {
       html = '';
     }
-    const codemirrorDoc = codemirror.getDoc();
+
     this.fileUploadCount = 0;
-    // 只要有html内容，就不处理剪切板里的其他内容，这么做的后果是粘贴excel内容时，只会粘贴html内容，不会把excel对应的截图粘进来
+    // 处理文件上传
     for (let i = 0; !html && i < items.length; i++) {
       const item = items[i];
       // 判断是否为图片数据
@@ -336,15 +316,7 @@ export default class Editor {
             return;
           }
           const mdStr = `${this.fileUploadCount > 1 ? '\n' : ''}${handleFileUploadCallback(url, params, file)}`;
-          codemirrorDoc.replaceSelection(mdStr);
-          // if (this.pasterHtml) {
-          //   // 如果同时粘贴了html内容和文件内容，则在文件上传完成后强制让光标处于非选中状态，以防止自动选中的html内容被文件内容替换掉
-          //   const { line, ch } = codemirror.getCursor();
-          //   codemirror.setSelection({ line, ch }, { line, ch });
-          //   codemirrorDoc.replaceSelection(mdStr, 'end');
-          // } else {
-          //   codemirrorDoc.replaceSelection(mdStr);
-          // }
+          this.replaceSelection(mdStr);
         });
         event.preventDefault();
       }
@@ -361,15 +333,15 @@ export default class Editor {
     html = divObj.innerHTML;
     const mdText = htmlParser.run(html);
     if (typeof mdText === 'string' && mdText.trim().length > 0) {
-      const range = codemirror.listSelections();
-      if (codemirror.getSelections().length <= 1 && range[0] && range[0].anchor) {
-        const currentCursor = {};
-        currentCursor.line = range[0].anchor.line;
-        currentCursor.ch = range[0].anchor.ch;
-        codemirrorDoc.replaceSelection(mdText);
-        pasteHelper.showSwitchBtnAfterPasteHtml(this.$cherry, currentCursor, codemirror, htmlText, mdText);
-      } else {
-        codemirrorDoc.replaceSelection(mdText);
+      const view = this.editorView;
+      if (view) {
+        const selection = view.state.selection.main;
+        const currentCursor = {
+          line: view.state.doc.lineAt(selection.from).number - 1,
+          ch: selection.from - view.state.doc.lineAt(selection.from).from,
+        };
+        this.replaceSelection(mdText);
+        pasteHelper.showSwitchBtnAfterPasteHtml(this.$cherry, currentCursor, this, htmlText, mdText);
       }
       event.preventDefault();
     }
@@ -377,46 +349,75 @@ export default class Editor {
   }
 
   /**
-   *
-   * @param {CodeMirror.Editor} codemirror
+   * 替换选中内容
+   * @param {string} text
    */
-  onScroll = (codemirror) => {
-    this.$cherry.$event.emit('cleanAllSubMenus'); // 滚动时清除所有子菜单，这不应该在Bubble中处理，我们关注的是编辑器的滚动  add by ufec
+  replaceSelection(text) {
+    const view = this.editorView;
+    if (!view) return;
+
+    view.dispatch(
+      view.state.changeByRange((range) => ({
+        changes: { from: range.from, to: range.to, insert: text },
+        range: EditorSelection.cursor(range.from + text.length),
+      })),
+    );
+  }
+
+  /**
+   * 处理滚动事件
+   */
+  onScroll = () => {
+    this.$cherry.$event.emit('cleanAllSubMenus');
     if (this.disableScrollListener) {
       this.disableScrollListener = false;
       return;
     }
-    const scroller = codemirror.getScrollerElement();
-    if (scroller.scrollTop <= 0) {
+
+    const view = this.editorView;
+    if (!view) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = view.scrollDOM;
+
+    if (scrollTop <= 0) {
       this.previewer.scrollToLineNum(0);
       return;
     }
-    if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 20) {
+    if (scrollTop + clientHeight >= scrollHeight - 20) {
       this.previewer.scrollToLineNum(null); // 滚动到底
       return;
     }
-    const currentTop = codemirror.getScrollInfo().top;
-    const targetLine = codemirror.lineAtHeight(currentTop, 'local');
-    const lineRect = codemirror.charCoords({ line: targetLine, ch: 0 }, 'local');
-    const lineHeight = codemirror.getLineHandle(targetLine).height;
-    const lineTop = lineRect.bottom - lineHeight; // 直接用lineRect.top在自动折行时计算的是最后一行的top
-    const percent = (100 * (currentTop - lineTop)) / lineHeight / 100;
-    // console.log(percent);
-    // codemirror中行号以0开始，所以需要+1
-    this.previewer.scrollToLineNum(targetLine + 1, percent);
+
+    // 获取当前视口顶部的行号
+    const viewportTop = view.scrollDOM.scrollTop;
+    const topPos = view.posAtCoords({ x: 0, y: view.contentDOM.getBoundingClientRect().top + viewportTop });
+    if (topPos !== null) {
+      const line = view.state.doc.lineAt(topPos);
+      const lineBlock = view.lineBlockAt(topPos);
+      const lineHeight = view.defaultLineHeight;
+      const percent = Math.max(0, (viewportTop - lineBlock.top) / lineHeight / 100);
+
+      this.previewer.scrollToLineNum(line.number, percent);
+    }
   };
 
   /**
-   *
-   * @param {CodeMirror.Editor} codemirror
+   * 处理鼠标按下事件
    * @param {MouseEvent} evt
    */
-  onMouseDown = (codemirror, evt) => {
-    this.$cherry.$event.emit('cleanAllSubMenus'); // Bubble中处理需要考虑太多，直接在编辑器中处理可包括Bubble中所有情况，因为产生Bubble的前提是光标在编辑器中 add by ufec
-    const { line: targetLine } = codemirror.getCursor();
-    const top = Math.abs(evt.y - codemirror.getWrapperElement().getBoundingClientRect().y);
-    this.previewer.scrollToLineNumWithOffset(targetLine + 1, top);
-    this.toHalfWidth(codemirror, evt);
+  onMouseDown = (evt) => {
+    this.$cherry.$event.emit('cleanAllSubMenus');
+    const view = this.editorView;
+    if (!view) return;
+
+    const pos = view.posAtCoords({ x: evt.clientX, y: evt.clientY });
+    if (pos !== null) {
+      const line = view.state.doc.lineAt(pos);
+      const top = Math.abs(evt.clientY - view.scrollDOM.getBoundingClientRect().top);
+      this.previewer.scrollToLineNumWithOffset(line.number, top);
+    }
+
+    this.toHalfWidth(evt);
   };
 
   /**
@@ -427,7 +428,7 @@ export default class Editor {
   };
 
   /**
-   *
+   * 初始化编辑器
    * @param {*} previewer
    */
   init(previewer) {
@@ -435,206 +436,223 @@ export default class Editor {
     if (!(textArea instanceof HTMLTextAreaElement)) {
       throw new Error('The specific element is not a textarea.');
     }
-    const editor = codemirror.fromTextArea(textArea, this.options.codemirror);
-    // 以下逻辑是针对\t等空白字符的处理，似乎已经不需要了，先注释掉，等有反馈了再考虑加回来
-    // editor.addOverlay({
-    //   name: 'invisibles',
-    //   token: function nextToken(stream) {
-    //     let tokenClass;
-    //     let spaces = 0;
-    //     let peek = stream.peek() === ' ';
-    //     if (peek) {
-    //       while (peek && spaces < Number.MAX_VALUE) {
-    //         spaces += 1;
-    //         stream.next();
-    //         peek = stream.peek() === ' ';
-    //       }
-    //       tokenClass = `whitespace whitespace-${spaces}`;
-    //     } else {
-    //       while (!stream.eol()) {
-    //         stream.next();
-    //       }
-    //       tokenClass = '';
-    //     }
-    //     return tokenClass;
-    //   },
-    // });
+
     this.previewer = previewer;
     this.disableScrollListener = false;
 
-    if (this.options.value) {
-      editor.setOption('value', this.options.value);
-    }
-
-    editor.on('blur', (codemirror, evt) => {
-      this.options.onBlur(evt, codemirror);
-      this.$cherry.$event.emit('blur', { evt, cherry: this.$cherry });
-    });
-
-    editor.on('focus', (codemirror, evt) => {
-      this.options.onFocus(evt, codemirror);
-      this.$cherry.$event.emit('focus', { evt, cherry: this.$cherry });
-    });
-
-    editor.on('change', (codemirror, evt) => {
-      this.options.onChange(evt, codemirror);
-      this.dealSpecialWords();
-      if (this.options.autoSave2Textarea) {
-        // @ts-ignore
-        // 将codemirror里的内容回写到textarea里
-        codemirror.save();
-      }
-    });
-
-    editor.on('keydown', (codemirror, evt) => {
-      this.options.onKeydown(evt, codemirror);
-    });
-
-    editor.on('keyup', (codemirror, evt) => {
-      this.onKeyup(evt, codemirror);
-    });
-
-    editor.on('paste', (codemirror, evt) => {
-      this.options.onPaste.call(this, evt, codemirror);
-    });
-
-    if (this.options.autoScrollByCursor) {
-      editor.on('mousedown', (codemirror, evt) => {
-        setTimeout(() => {
-          this.onMouseDown(codemirror, evt);
-        });
-      });
-    }
-
-    editor.on('drop', (codemirror, evt) => {
-      const files = evt.dataTransfer.files || [];
-      if (files && files.length > 0) {
-        // 增加延时，让drop的位置变成codemirror的光标位置
-        setTimeout(() => {
-          for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const fileType = file.type || '';
-            // text格式或md格式文件，直接读取内容，不做上传文件的操作
-            if (/\.(text|md)/.test(file.name) || /^text/i.test(fileType)) {
-              continue;
-            }
-            this.$cherry.options.callback.fileUpload(file, (url, params = {}) => {
-              if (typeof url !== 'string') {
-                return;
-              }
-              // 拖拽上传文件时，强制改成没有文字选择区的状态
-              codemirror.setSelection(codemirror.getCursor());
-              const mdStr = handleFileUploadCallback(url, params, file);
-              // 当批量上传文件时，每个被插入的文件中间需要加个换行，但单个上传文件的时候不需要加换行
-              const insertValue = i > 0 ? `\n${mdStr} ` : `${mdStr} `;
-              codemirror.replaceSelection(insertValue);
-              this.dealSpecialWords();
+    // 创建 CodeMirror 6 扩展
+    const extensions = [
+      markdown(),
+      lineNumbers(),
+      keymap.of([...defaultKeymap, ...searchKeymap, ...completionKeymap, indentWithTab]),
+      search({ top: true }),
+      autocompletion(),
+      bracketMatching(),
+      highlightSelectionMatches(),
+      EditorView.lineWrapping,
+      EditorView.theme({
+        '.cm-scroller': {
+          overflow: 'auto',
+          height: '100%',
+        },
+        '.cm-editor': {
+          height: '100%',
+        },
+        '.cm-content': {
+          minHeight: '100%',
+        },
+      }),
+      EditorView.updateListener.of((update) => {
+        if (update.docChanged) {
+          this.options.onChange(update, this);
+          this.dealSpecialWords();
+          if (this.options.autoSave2Textarea) {
+            textArea.value = this.getValue();
+          }
+          // 触发 CodeMirror 5 兼容的 change 事件
+          this._fireEvent('change', this.editorView, update);
+        }
+        if (update.selectionSet) {
+          this.onCursorActivity();
+          // 触发 CodeMirror 5 兼容的 cursorActivity 事件
+          this._fireEvent('cursorActivity');
+        }
+      }),
+      EditorView.domEventHandlers({
+        keydown: (event) => {
+          this.options.onKeydown(event, this);
+          return false;
+        },
+        keyup: (event) => {
+          this.onKeyup(event);
+          return false;
+        },
+        paste: (event) => {
+          this.options.onPaste.call(this, event);
+          return false;
+        },
+        mousedown: (event) => {
+          if (this.options.autoScrollByCursor) {
+            setTimeout(() => {
+              this.onMouseDown(event);
             });
           }
-        }, 50);
-      }
+          return false;
+        },
+        drop: (event) => {
+          const files = event.dataTransfer?.files || [];
+          if (files && files.length > 0) {
+            setTimeout(() => {
+              for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const fileType = file.type || '';
+                if (/\.(text|md)/.test(file.name) || /^text/i.test(fileType)) {
+                  continue;
+                }
+                this.$cherry.options.callback.fileUpload(file, (url, params = {}) => {
+                  if (typeof url !== 'string') {
+                    return;
+                  }
+                  const mdStr = handleFileUploadCallback(url, params, file);
+                  const insertValue = i > 0 ? `\n${mdStr} ` : `${mdStr} `;
+                  this.replaceSelection(insertValue);
+                  this.dealSpecialWords();
+                });
+              }
+            }, 50);
+          }
+          return false;
+        },
+        scroll: () => {
+          this.options.onScroll();
+          this.options.writingStyle === 'focus' && this.refreshWritingStatus();
+          // 触发 CodeMirror 5 兼容的 scroll 事件
+          this._fireEvent('scroll', this.editorView);
+        },
+        focus: (event) => {
+          this.options.onFocus(event, this);
+          this.$cherry.$event.emit('focus', { evt: event, cherry: this.$cherry });
+          return false;
+        },
+        blur: (event) => {
+          this.options.onBlur(event, this);
+          this.$cherry.$event.emit('blur', { evt: event, cherry: this.$cherry });
+          return false;
+        },
+      }),
+    ];
+
+    // 创建编辑器状态
+    this.editorState = EditorState.create({
+      doc: this.options.value || '',
+      extensions,
     });
 
-    editor.on('scroll', (codemirror) => {
-      this.options.onScroll(codemirror);
-      this.options.writingStyle === 'focus' && this.refreshWritingStatus();
+    // 创建编辑器视图
+    this.editorView = new EditorView({
+      state: this.editorState,
+      parent: this.options.editorDom,
     });
 
-    editor.on('cursorActivity', () => {
-      this.onCursorActivity();
-    });
-    editor.on('beforeChange', (codemirror) => {
-      this.selectAll = this.editor.getValue() === codemirror.getSelection();
-    });
+    // 隐藏原始 textarea
+    textArea.style.display = 'none';
+
+    // 设置别名以保持兼容性
+    this.editor = this.editorView;
 
     addEvent(
-      this.getEditorDom(),
+      this.editorView.scrollDOM,
       'wheel',
       () => {
-        // 鼠标滚轮滚动时，强制监听滚动事件
         this.disableScrollListener = false;
-        // 打断滚动动画
         cancelAnimationFrame(this.animation.timer);
         this.animation.timer = 0;
       },
       false,
     );
 
-    /**
-     * @property
-     * @type {CodeMirror.Editor}
-     */
-    this.editor = editor;
-
     if (this.options.writingStyle !== 'normal') {
       this.initWritingStyle();
     }
-    // 处理特殊字符，主要将base64等大文本替换成占位符，以提高可读性
+
     this.dealSpecialWords();
 
     this.domWidth = this.getEditorDom().offsetWidth;
-    // 监听编辑器宽度变化
     const resizeObserver = new ResizeObserver((entries) => {
       if (this.getEditorDom().offsetWidth !== this.domWidth && this.$cherry.status.editor === 'show') {
         this.domWidth = this.getEditorDom().offsetWidth;
-        this.editor.refresh();
+        // CodeMirror 6 会自动处理大小调整
       }
     });
     resizeObserver.observe(this.getEditorDom());
   }
 
   /**
-   *
+   * 跳转到指定行
    * @param {number | null} beginLine 起始行，传入null时跳转到文档尾部
    * @param {number} [endLine] 终止行
    * @param {number} [percent] 百分比，取值0~1
    */
   jumpToLine(beginLine, endLine, percent) {
+    const view = this.editorView;
+    if (!view) return;
+
     if (beginLine === null) {
       cancelAnimationFrame(this.animation.timer);
       this.disableScrollListener = true;
-      this.editor.scrollIntoView({
-        line: this.editor.lineCount() - 1,
-        ch: 1,
+      const lastLine = view.state.doc.lines;
+      const pos = view.state.doc.line(lastLine).to;
+      view.dispatch({
+        selection: { anchor: pos },
+        effects: EditorView.scrollIntoView(pos),
       });
       this.animation.timer = 0;
       return;
     }
-    const position = this.editor.charCoords({ line: beginLine, ch: 0 }, 'local');
-    let { top } = position;
-    const positionEnd = this.editor.charCoords({ line: beginLine + endLine, ch: 0 }, 'local');
-    const height = positionEnd.top - position.top;
-    top += height * percent;
-    this.animation.destinationTop = Math.ceil(top - 15);
+
+    const line = view.state.doc.line(Math.min(beginLine + 1, view.state.doc.lines));
+    let pos = line.from;
+
+    if (endLine && percent) {
+      const endLineObj = view.state.doc.line(Math.min(beginLine + endLine + 1, view.state.doc.lines));
+      const range = endLineObj.to - line.from;
+      pos = line.from + Math.floor(range * percent);
+    }
+
+    const blockInfo = view.lineBlockAt(pos);
+    const targetTop = blockInfo.top + blockInfo.height * (percent || 0);
+    this.animation.destinationTop = Math.ceil(targetTop - 15);
+
     if (this.animation.timer) {
       return;
     }
+
     const animationHandler = () => {
-      const currentTop = this.editor.getScrollInfo().top;
+      const currentTop = view.scrollDOM.scrollTop;
       const delta = this.animation.destinationTop - currentTop;
-      // 100毫秒内完成动画
       const move = Math.ceil(Math.min(Math.abs(delta), Math.max(1, Math.abs(delta) / (100 / 16.7))));
-      // console.log('should scroll: ', move, delta, currentTop, this.animation.destinationTop);
+
       if (delta > 0) {
         if (currentTop >= this.animation.destinationTop) {
           this.animation.timer = 0;
           return;
         }
         this.disableScrollListener = true;
-        this.editor.scrollTo(null, currentTop + move);
+        view.scrollDOM.scrollTop = currentTop + move;
       } else if (delta < 0) {
         if (currentTop <= this.animation.destinationTop || currentTop <= 0) {
           this.animation.timer = 0;
           return;
         }
         this.disableScrollListener = true;
-        this.editor.scrollTo(null, currentTop - move);
+        view.scrollDOM.scrollTop = currentTop - move;
       } else {
         this.animation.timer = 0;
         return;
       }
-      // 无法再继续滚动
-      if (currentTop === this.editor.getScrollInfo().top || move >= Math.abs(delta)) {
+
+      const newScrollTop = view.scrollDOM.scrollTop;
+      if (currentTop === newScrollTop || move >= Math.abs(delta)) {
         this.animation.timer = 0;
         return;
       }
@@ -644,7 +662,7 @@ export default class Editor {
   }
 
   /**
-   *
+   * 滚动到指定行号
    * @param {number | null} lineNum
    * @param {number} [endLine]
    * @param {number} [percent]
@@ -660,7 +678,7 @@ export default class Editor {
   }
 
   /**
-   *
+   * 获取编辑器DOM
    * @returns {HTMLElement}
    */
   getEditorDom() {
@@ -668,12 +686,14 @@ export default class Editor {
   }
 
   /**
-   *
+   * 添加事件监听器
    * @param {string} event 事件名
    * @param {EditorEventCallback} callback 回调函数
    */
   addListener(event, callback) {
-    this.editor.on(event, callback);
+    // CodeMirror 6 使用不同的事件系统
+    // 这里需要根据具体事件类型来处理
+    console.warn('addListener method needs to be implemented for CodeMirror 6');
   }
 
   /**
@@ -711,23 +731,32 @@ export default class Editor {
     Array.from(document.head.childNodes).find((node) => node === style) || document.head.appendChild(style);
     const { sheet } = style;
     Array.from(Array(sheet.cssRules.length)).forEach(() => sheet.deleteRule(0));
+
+    const view = this.editorView;
+    if (!view) return;
+
     if (writingStyle === 'focus') {
       const editorDomRect = this.getEditorDom().getBoundingClientRect();
-      // 获取光标所在位置
-      const { top, bottom } = this.editor.charCoords(this.editor.getCursor());
-      // 光标上部距离编辑器顶部距离（不包含菜单）
-      const topHeight = top - editorDomRect.top;
-      // 光标下部距离编辑器底部距离
-      const bottomHeight = editorDomRect.height - (bottom - editorDomRect.top);
-      sheet.insertRule(`.${className}::before { height: ${topHeight > 0 ? topHeight : 0}px; }`, 0);
-      sheet.insertRule(`.${className}::after { height: ${bottomHeight > 0 ? bottomHeight : 0}px; }`, 0);
+      const selection = view.state.selection.main;
+      const cursorCoords = view.coordsAtPos(selection.head);
+
+      if (cursorCoords) {
+        const topHeight = cursorCoords.top - editorDomRect.top;
+        const bottomHeight = editorDomRect.height - (cursorCoords.bottom - editorDomRect.top);
+        sheet.insertRule(`.${className}::before { height: ${topHeight > 0 ? topHeight : 0}px; }`, 0);
+        sheet.insertRule(`.${className}::after { height: ${bottomHeight > 0 ? bottomHeight : 0}px; }`, 0);
+      }
     }
     if (writingStyle === 'typewriter') {
-      // 编辑器顶/底部填充的空白高度 (用于内容不足时使光标所在行滚动到编辑器中央)
-      const height = this.editor.getScrollInfo().clientHeight / 2;
-      sheet.insertRule(`.${className} .CodeMirror-lines::before { height: ${height}px; }`, 0);
-      sheet.insertRule(`.${className} .CodeMirror-lines::after { height: ${height}px; }`, 0);
-      this.editor.scrollTo(null, this.editor.cursorCoords(null, 'local').top - height);
+      const height = view.scrollDOM.clientHeight / 2;
+      sheet.insertRule(`.${className} .cm-content::before { height: ${height}px; content: ''; display: block; }`, 0);
+      sheet.insertRule(`.${className} .cm-content::after { height: ${height}px; content: ''; display: block; }`, 0);
+
+      const selection = view.state.selection.main;
+      const cursorCoords = view.coordsAtPos(selection.head);
+      if (cursorCoords) {
+        view.scrollDOM.scrollTop = cursorCoords.top - height;
+      }
     }
   }
 
@@ -743,6 +772,231 @@ export default class Editor {
    * 设置编辑器值
    */
   setValue(value = '') {
-    this.editor.setOption('value', value);
+    const view = this.editorView;
+    if (!view) return;
+
+    view.dispatch({
+      changes: {
+        from: 0,
+        to: view.state.doc.length,
+        insert: value,
+      },
+    });
+  }
+
+  /**
+   * 获取编辑器值
+   */
+  getValue() {
+    const view = this.editorView;
+    if (!view) return '';
+    return view.state.doc.toString();
+  }
+
+  // CodeMirror 5 兼容性方法
+  getCursor() {
+    const view = this.editorView;
+    if (!view) return { line: 0, ch: 0 };
+
+    const pos = view.state.selection.main.head;
+    const line = view.state.doc.lineAt(pos);
+    return { line: line.number - 1, ch: pos - line.from };
+  }
+
+  setCursor(line, ch = 0) {
+    const view = this.editorView;
+    if (!view) return;
+
+    const pos = view.state.doc.line(line + 1).from + ch;
+    view.dispatch({
+      selection: { anchor: pos },
+    });
+  }
+
+  getLine(lineNum) {
+    const view = this.editorView;
+    if (!view) return '';
+
+    const line = view.state.doc.line(lineNum + 1);
+    return line.text;
+  }
+
+  getSelection() {
+    const view = this.editorView;
+    if (!view) return '';
+
+    const selection = view.state.selection.main;
+    return view.state.doc.sliceString(selection.from, selection.to);
+  }
+
+  setSelection(anchor, head = null) {
+    const view = this.editorView;
+    if (!view) return;
+
+    let anchorPos, headPos;
+
+    if (typeof anchor === 'object' && anchor.line !== undefined) {
+      const anchorLine = view.state.doc.line(anchor.line + 1);
+      anchorPos = anchorLine.from + anchor.ch;
+    } else {
+      anchorPos = anchor;
+    }
+
+    if (head === null) {
+      headPos = anchorPos;
+    } else if (typeof head === 'object' && head.line !== undefined) {
+      const headLine = view.state.doc.line(head.line + 1);
+      headPos = headLine.from + head.ch;
+    } else {
+      headPos = head;
+    }
+
+    view.dispatch({
+      selection: { anchor: anchorPos, head: headPos },
+    });
+  }
+
+  replaceSelections(replacements, select = 'end') {
+    const view = this.editorView;
+    if (!view) return;
+
+    const ranges = view.state.selection.ranges;
+    if (ranges.length !== replacements.length) return;
+
+    const changes = ranges.map((range, i) => ({
+      from: range.from,
+      to: range.to,
+      insert: replacements[i],
+    }));
+
+    view.dispatch({
+      changes,
+      selection:
+        select === 'around'
+          ? view.state.selection
+          : EditorSelection.create(changes.map((change) => EditorSelection.cursor(change.from + change.insert.length))),
+    });
+  }
+
+  getDoc() {
+    const view = this.editorView;
+    if (!view) return null;
+
+    return {
+      indexFromPos: (pos) => {
+        const line = view.state.doc.line(pos.line + 1);
+        return line.from + pos.ch;
+      },
+      posFromIndex: (index) => {
+        const line = view.state.doc.lineAt(index);
+        return { line: line.number - 1, ch: index - line.from };
+      },
+    };
+  }
+
+  findWordAt(pos) {
+    const view = this.editorView;
+    if (!view) return { anchor: pos, head: pos };
+
+    const docPos =
+      typeof pos === 'object' && pos.line !== undefined ? view.state.doc.line(pos.line + 1).from + pos.ch : pos;
+
+    const line = view.state.doc.lineAt(docPos);
+    const text = line.text;
+    const offset = docPos - line.from;
+
+    // 简单的单词边界检测
+    let start = offset;
+    let end = offset;
+
+    while (start > 0 && /\w/.test(text[start - 1])) start -= 1;
+    while (end < text.length && /\w/.test(text[end])) end += 1;
+
+    const startPos = { line: line.number - 1, ch: start };
+    const endPos = { line: line.number - 1, ch: end };
+
+    return { anchor: startPos, head: endPos };
+  }
+
+  getOption(option) {
+    // 返回默认值以保持兼容性
+    switch (option) {
+      case 'extraKeys':
+        return this._extraKeys || {};
+      default:
+        return undefined;
+    }
+  }
+
+  setOption(option, value) {
+    switch (option) {
+      case 'extraKeys':
+        this._extraKeys = value;
+        // 在 CodeMirror 6 中需要重新配置 keymap
+        break;
+    }
+  }
+
+  on(event, callback) {
+    // 将事件监听器存储起来，以便后续使用
+    if (!this._eventListeners) {
+      this._eventListeners = new Map();
+    }
+
+    if (!this._eventListeners.has(event)) {
+      this._eventListeners.set(event, []);
+    }
+
+    this._eventListeners.get(event).push(callback);
+
+    // 根据事件类型设置对应的处理
+    switch (event) {
+      case 'change':
+        // change 事件已经在 EditorView.updateListener 中处理
+        break;
+      case 'cursorActivity':
+        // cursorActivity 事件已经在 EditorView.updateListener 中处理
+        break;
+      case 'scroll':
+        // scroll 事件已经在 domEventHandlers 中处理
+        break;
+      case 'keydown':
+        // keydown 事件已经在 domEventHandlers 中处理
+        break;
+    }
+  }
+
+  // 触发事件的辅助方法
+  _fireEvent(event, ...args) {
+    if (this._eventListeners && this._eventListeners.has(event)) {
+      this._eventListeners.get(event).forEach((callback) => {
+        callback(...args);
+      });
+    }
+  }
+
+  focus() {
+    const view = this.editorView;
+    if (view) {
+      view.focus();
+    }
+  }
+
+  scrollIntoView(pos) {
+    const view = this.editorView;
+    if (!view) return;
+
+    if (pos === null) {
+      // 滚动到当前光标位置
+      view.dispatch({
+        effects: EditorView.scrollIntoView(view.state.selection.main.head),
+      });
+    } else if (typeof pos === 'object' && pos.line !== undefined) {
+      const line = view.state.doc.line(pos.line + 1);
+      const docPos = line.from + (pos.ch || 0);
+      view.dispatch({
+        effects: EditorView.scrollIntoView(docPos),
+      });
+    }
   }
 }

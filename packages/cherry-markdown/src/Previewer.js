@@ -118,6 +118,10 @@ export default class Previewer {
     this.animation = {};
   }
 
+  /**
+   * 初始化预览区
+   * @param {import('./Editor').default} editor 编辑器实例
+   */
   init(editor) {
     /**
      * @property
@@ -137,7 +141,7 @@ export default class Previewer {
   }
 
   /**
-   * “监听”编辑器的尺寸变化，变化时更新拖拽条的位置
+   * "监听"编辑器的尺寸变化，变化时更新拖拽条的位置
    */
   onSizeChange() {
     // 创建一个新的 ResizeObserver 实例
@@ -303,14 +307,21 @@ export default class Previewer {
     // 主动设置mask和dragLine位置,按px计算
     const { editorMaskDom, previewerMaskDom, virtualDragLineDom: virtualLineDom } = this.options;
     const $startWidth = 0; // =startWidth
+    const containerHeight = this.editor.options.editorDom.parentElement.offsetHeight;
 
     editorMaskDom.style.left = `${$startWidth}px`;
     editorMaskDom.style.width = `${leftWidth}px`;
+    editorMaskDom.style.height = `${containerHeight}px`;
+    editorMaskDom.style.top = '0px';
 
     virtualLineDom.style.left = `${$startWidth + leftWidth}px`;
+    virtualLineDom.style.height = `${containerHeight}px`;
+    virtualLineDom.style.top = '0px';
 
     previewerMaskDom.style.left = `${$startWidth + leftWidth}px`;
     previewerMaskDom.style.width = `${rightWidth}px`;
+    previewerMaskDom.style.height = `${containerHeight}px`;
+    previewerMaskDom.style.top = '0px';
   }
 
   bindDrag() {
@@ -361,7 +372,7 @@ export default class Previewer {
       this.options.previewerMaskDom.classList.remove('cherry-previewer-mask--show');
       this.options.virtualDragLineDom.classList.remove('cherry-drag--show');
       // 刷新codemirror宽度
-      this.editor.editor.refresh();
+      this.editor.editorView.requestMeasure();
       // 取消事件绑定
       removeEvent(document, 'mousemove', dragLineMouseMove, false);
       removeEvent(document, 'mouseup', dragLineMouseUp, false);
@@ -768,7 +779,7 @@ export default class Previewer {
       previewerDom.classList.remove('cherry-previewer--hidden');
       editorDom.classList.remove('cherry-editor--full');
     }
-    setTimeout(() => this.editor.editor.refresh(), 0);
+    setTimeout(() => this.editor.editorView.requestMeasure(), 0);
   }
 
   previewOnly() {
@@ -821,7 +832,9 @@ export default class Previewer {
     this.$cherry.$event.emit('previewerOpen');
     this.$cherry.$event.emit('editorOpen');
 
-    setTimeout(() => this.editor.editor.refresh(), 0);
+    setTimeout(() => {
+      this.editor.editorView.requestMeasure();
+    }, 0);
   }
 
   doHtmlCache(html) {
@@ -855,8 +868,8 @@ export default class Previewer {
 
   /**
    * 根据行号计算出top值
-   * @param {Number} lineNum
-   * @param {Number} linePercent
+   * @param {Number} lineNum 行号
+   * @param {Number} linePercent 行内百分比位置,范围0-1,用于精确定位行内具体位置
    * @return {Number} top
    */
   $getTopByLineNum(lineNum, linePercent = 0) {

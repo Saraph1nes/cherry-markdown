@@ -22,10 +22,11 @@
 import escapeRegExp from 'lodash/escapeRegExp';
 import SyntaxBase from '@/core/SyntaxBase';
 import { allSuggestList, suggesterKeywords } from '@/core/hooks/SuggestList';
-import { Pass } from 'codemirror/src/util/misc';
 import { isLookbehindSupported } from '@/utils/regexp';
 import { replaceLookbehind } from '@/utils/lookbehind-replace';
 import { isBrowser } from '@/utils/env';
+import { EditorView, keymap } from '@codemirror/view';
+import { StateEffect } from '@codemirror/state';
 
 /**
  * @typedef {import('codemirror')} CodeMirror
@@ -275,70 +276,60 @@ class SuggesterPanel {
       return;
     }
     let keyAction = false;
-    this.editor.editor.on('change', (codemirror, evt) => {
-      keyAction = true;
-      this.onCodeMirrorChange(codemirror, evt);
+
+    const updateListener = EditorView.updateListener.of((update) => {
+      if (update.docChanged) {
+        keyAction = true;
+        const changes = update.changes.desc;
+        const evt = {
+          text: [update.state.doc.sliceString(changes.from, changes.to) || ''],
+          from: {
+            line: changes.from ? update.state.doc.lineAt(changes.from).number - 1 : 0,
+            ch: changes.from || 0,
+          },
+          to: {
+            line: changes.to ? update.state.doc.lineAt(changes.to).number - 1 : 0,
+            ch: changes.to || 0,
+          },
+          origin: '+input',
+        };
+        this.onCodeMirrorChange(this.editor.editorView, evt);
+      }
     });
 
-    this.editor.editor.on('keydown', (codemirror, evt) => {
+    this.editor.editorView.dispatch({
+      effects: StateEffect.appendConfig.of(updateListener),
+    });
+
+    // 添加键盘事件监听
+    this.editor.editorView.dom.addEventListener('keydown', (evt) => {
       keyAction = true;
       if (this.enableRelate()) {
-        this.onKeyDown(codemirror, evt);
+        this.onKeyDown(this.editor.editorView, evt);
       }
     });
 
-    this.editor.editor.on('cursorActivity', () => {
-      // 当编辑区光标位置改变时触发
-      if (!keyAction) {
-        this.stopRelate();
-      }
-      keyAction = false;
-    });
-
-    const extraKeys = this.editor.editor.getOption('extraKeys');
-    const decorateKeys = ['Up', 'Down', 'Enter'];
-    decorateKeys.forEach((key) => {
-      if (typeof extraKeys[key] === 'function') {
-        const proxyTarget = extraKeys[key];
-        extraKeys[key] = (codemirror) => {
-          if (this.cursorMove) {
-            const res = proxyTarget.call(codemirror, codemirror);
-
-            if (res) {
-              return res;
-            }
-            // logic to decide whether to move up or not
-            // return Pass.toString();
-          }
-        };
-      } else if (!extraKeys[key]) {
-        extraKeys[key] = () => {
-          if (this.cursorMove) {
-            // logic to decide whether to move up or not
-            return Pass.toString();
-          }
-        };
-      } else if (typeof extraKeys[key] === 'string') {
-        const command = extraKeys[key];
-        extraKeys[key] = (codemirror) => {
-          if (this.cursorMove) {
-            this.editor.editor.execCommand(command);
-
-            // logic to decide whether to move up or not
-            // return Pass.toString();
-          }
-        };
+    const selectionSetListener = EditorView.updateListener.of((update) => {
+      if (update.selectionSet) {
+        // 当编辑区光标位置改变时触发
+        if (!keyAction) {
+          this.stopRelate();
+        }
+        keyAction = false;
       }
     });
 
-    this.editor.editor.setOption('extraKeys', extraKeys);
+    // 监听选区变化
+    this.editor.editorView.dispatch({
+      effects: StateEffect.appendConfig.of(selectionSetListener),
+    });
 
-    this.editor.editor.on('scroll', (codemirror, evt) => {
+    this.editor.editorView.scrollDOM.addEventListener('scroll', () => {
       if (!this.searchCache) {
         return;
       }
       // 当编辑器滚动时触发
-      this.relocatePanel(this.editor.editor);
+      this.relocatePanel(this.editor.editorView);
     });
 
     this.onClickPanelItem();

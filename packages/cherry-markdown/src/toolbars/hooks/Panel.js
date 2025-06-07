@@ -91,7 +91,10 @@ export default class Panel extends MenuBase {
     if (currentName === false) {
       // 如果没有命中面板语法，则尝试扩大选区
       this.getMoreSelection('::: ', '\n', () => {
-        const newSelection = this.editor.editor.getSelection();
+        const newSelection = this.editor.editorView.state.sliceDoc(
+          this.editor.editorView.state.selection.main.from,
+          this.editor.editorView.state.selection.main.to,
+        );
         const isMatch = this.$getNameFromStr(newSelection);
         if (isMatch !== false) {
           $selection = newSelection;

@@ -39,7 +39,10 @@ export default class H1 extends MenuBase {
     const header = '#';
     if (!this.isSelections && !this.$testIsHead($selection)) {
       this.getMoreSelection('\n', '', () => {
-        const newSelection = this.editor.editor.getSelection();
+        const newSelection = this.editor.editorView.state.sliceDoc(
+          this.editor.editorView.state.selection.main.from,
+          this.editor.editorView.state.selection.main.to,
+        );
         const isHead = this.$testIsHead(newSelection);
         if (isHead) {
           $selection = newSelection;

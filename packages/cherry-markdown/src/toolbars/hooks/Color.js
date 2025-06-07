@@ -70,7 +70,10 @@ export default class Color extends MenuBase {
       const end = type === 'text' ? '!!' : '!!!';
       if (!this.isSelections && !this.$testIsColor(type, $selection)) {
         this.getMoreSelection(begin, end, () => {
-          const newSelection = this.editor.editor.getSelection();
+          const newSelection = this.editor.editorView.state.sliceDoc(
+            this.editor.editorView.state.selection.main.from,
+            this.editor.editorView.state.selection.main.to,
+          );
           if (this.$testIsColor(type, newSelection)) {
             $selection = newSelection;
             return true;
