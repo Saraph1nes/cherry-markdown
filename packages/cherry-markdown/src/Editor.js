@@ -454,6 +454,7 @@ export default class Editor {
         '.cm-scroller': {
           overflow: 'auto',
           height: '100%',
+          lineHeight: '27px',
         },
         '.cm-editor': {
           height: '100%',
@@ -469,13 +470,13 @@ export default class Editor {
           if (this.options.autoSave2Textarea) {
             textArea.value = this.getValue();
           }
-          // 触发 CodeMirror 5 兼容的 change 事件
-          this._fireEvent('change', this.editorView, update);
+          // 触发 CodeMirror 5 兼容的 update 事件
+          this._fireEvent('update', this, update);
         }
         if (update.selectionSet) {
           this.onCursorActivity();
           // 触发 CodeMirror 5 兼容的 cursorActivity 事件
-          this._fireEvent('cursorActivity');
+          this._fireEvent('cursorActivity', this, update);
         }
       }),
       EditorView.domEventHandlers({
@@ -691,9 +692,8 @@ export default class Editor {
    * @param {EditorEventCallback} callback 回调函数
    */
   addListener(event, callback) {
-    // CodeMirror 6 使用不同的事件系统
-    // 这里需要根据具体事件类型来处理
-    console.warn('addListener method needs to be implemented for CodeMirror 6');
+    // 为保持 CodeMirror 5 兼容性，调用 on 方法
+    this.on(event, callback);
   }
 
   /**
@@ -827,6 +827,13 @@ export default class Editor {
 
     const selection = view.state.selection.main;
     return view.state.doc.sliceString(selection.from, selection.to);
+  }
+
+  getSelections() {
+    const view = this.editorView;
+    if (!view) return [''];
+
+    return view.state.selection.ranges.map((range) => view.state.doc.sliceString(range.from, range.to));
   }
 
   setSelection(anchor, head = null) {

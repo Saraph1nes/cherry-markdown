@@ -368,7 +368,7 @@ export default class CodeBlockHandler {
         '&': { height: '100%' },
         '.cm-content': { padding: '10px' },
         '.cm-focused': { outline: 'none' },
-        '.cm-scroller': { fontFamily: 'inherit' },
+        '.cm-scroller': { fontFamily: 'inherit', lineHeight: '27px' },
       }),
     ];
 
