@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 // @ts-check
-import codemirror from 'codemirror';
 // import 'codemirror/mode/markdown/markdown';
 import 'codemirror/mode/gfm/gfm'; // https://codemirror.net/mode/gfm/index.html
 import 'codemirror/mode/yaml-frontmatter/yaml-frontmatter'; // https://codemirror.net/5/mode/yaml-frontmatter/index.html
@@ -41,6 +40,8 @@ import { handleFileUploadCallback } from '@/utils/file';
 import { createElement } from './utils/dom';
 import { longTextReg, base64Reg, imgDrawioXmlReg } from './utils/regexp';
 import { handleNewlineIndentList } from './utils/autoindent';
+import { EditorView } from '@codemirror/view';
+import { EditorState } from '@codemirror/state';
 
 /**
  * @typedef {import('~types/editor').EditorConfiguration} EditorConfiguration
@@ -123,6 +124,7 @@ export default class Editor {
     this.options.codemirror.keyMap = this.options.keyMap;
     this.$cherry = this.options.$cherry;
     this.instanceId = this.$cherry.getInstanceId();
+    this.editorView = null;
   }
 
   /**
@@ -165,29 +167,30 @@ export default class Editor {
    * @param {*} className 利用codemirror的MarkText生成的新元素的class
    */
   formatBigData2Mark = (reg, className) => {
-    const codemirror = this.editor;
-    const searcher = codemirror.getSearchCursor(reg);
-
-    let oneSearch = searcher.findNext();
-    for (; oneSearch !== false; oneSearch = searcher.findNext()) {
-      const target = searcher.from();
-      if (!target) {
-        continue;
-      }
-      const bigString = oneSearch[2] ?? '';
-      const targetChFrom = target.ch + oneSearch[1]?.length;
-      const targetChTo = targetChFrom + bigString.length;
-      const targetLine = target.line;
-      const begin = { line: targetLine, ch: targetChFrom };
-      const end = { line: targetLine, ch: targetChTo };
-      // 如果所在区域已经有mark了，则不再增加mark
-      if (codemirror.findMarks(begin, end).length > 0) {
-        continue;
-      }
-      const newSpan = createElement('span', `cm-string ${className}`, { title: bigString });
-      newSpan.textContent = bigString;
-      codemirror.markText(begin, end, { replacedWith: newSpan, atomic: true });
-    }
+    // TODO codemirror6兼容
+    // console.log('formatBigData2Mark', { reg, className, editor: this.editor });
+    // const { editorView } = this.editor;
+    // const searcher = codemirror.getSearchCursor(reg);
+    // let oneSearch = searcher.findNext();
+    // for (; oneSearch !== false; oneSearch = searcher.findNext()) {
+    //   const target = searcher.from();
+    //   if (!target) {
+    //     continue;
+    //   }
+    //   const bigString = oneSearch[2] ?? '';
+    //   const targetChFrom = target.ch + oneSearch[1]?.length;
+    //   const targetChTo = targetChFrom + bigString.length;
+    //   const targetLine = target.line;
+    //   const begin = { line: targetLine, ch: targetChFrom };
+    //   const end = { line: targetLine, ch: targetChTo };
+    //   // 如果所在区域已经有mark了，则不再增加mark
+    //   if (codemirror.findMarks(begin, end).length > 0) {
+    //     continue;
+    //   }
+    //   const newSpan = createElement('span', `cm-string ${className}`, { title: bigString });
+    //   newSpan.textContent = bigString;
+    //   codemirror.markText(begin, end, { replacedWith: newSpan, atomic: true });
+    // }
   };
 
   /**
@@ -195,50 +198,51 @@ export default class Editor {
    * full width翻译为全角
    */
   formatFullWidthMark() {
-    if (!this.options.showFullWidthMark) {
-      return;
-    }
-    const { editor } = this;
-    const regex = /[·￥、：“”【】（）《》]/; // 此处以仅匹配单个全角符号
-    const searcher = editor.getSearchCursor(regex);
-    let oneSearch = searcher.findNext();
-    // 防止出现错误的mark
-    editor.getAllMarks().forEach(function (mark) {
-      if (mark.className === 'cm-fullWidth') {
-        const range = JSON.parse(JSON.stringify(mark.find()));
-        const markedText = editor.getRange(range.from, range.to);
-        if (!regex.test(markedText)) {
-          mark.clear();
-        }
-      }
-    });
-    for (; oneSearch !== false; oneSearch = searcher.findNext()) {
-      const target = searcher.from();
-      if (!target) {
-        continue;
-      }
-      const from = { line: target.line, ch: target.ch };
-      const to = { line: target.line, ch: target.ch + 1 };
-      // 当没有标记时再进行标记，判断textMaker的className必须为"cm-fullWidth"，
-      // 因为cm的addon里会引入className: "CodeMirror-composing"的textMaker干扰判断
-      const existMarksLength = editor.findMarks(from, to).filter((item) => {
-        return item.className === 'cm-fullWidth';
-      });
-      if (existMarksLength.length === 0) {
-        editor.markText(from, to, {
-          className: 'cm-fullWidth',
-          title: '按住Ctrl/Cmd点击切换成半角（Hold down Ctrl/Cmd and click to switch to half-width）',
-        });
-      }
-    }
+    // TODO codemirror6兼容
+    // if (!this.options.showFullWidthMark) {
+    //   return;
+    // }
+    // const { editor } = this;
+    // const regex = /[·￥、：“”【】（）《》]/; // 此处以仅匹配单个全角符号
+    // const searcher = editor.getSearchCursor(regex);
+    // let oneSearch = searcher.findNext();
+    // // 防止出现错误的mark
+    // editor.getAllMarks().forEach(function (mark) {
+    //   if (mark.className === 'cm-fullWidth') {
+    //     const range = JSON.parse(JSON.stringify(mark.find()));
+    //     const markedText = editor.getRange(range.from, range.to);
+    //     if (!regex.test(markedText)) {
+    //       mark.clear();
+    //     }
+    //   }
+    // });
+    // for (; oneSearch !== false; oneSearch = searcher.findNext()) {
+    //   const target = searcher.from();
+    //   if (!target) {
+    //     continue;
+    //   }
+    //   const from = { line: target.line, ch: target.ch };
+    //   const to = { line: target.line, ch: target.ch + 1 };
+    //   // 当没有标记时再进行标记，判断textMaker的className必须为"cm-fullWidth"，
+    //   // 因为cm的addon里会引入className: "CodeMirror-composing"的textMaker干扰判断
+    //   const existMarksLength = editor.findMarks(from, to).filter((item) => {
+    //     return item.className === 'cm-fullWidth';
+    //   });
+    //   if (existMarksLength.length === 0) {
+    //     editor.markText(from, to, {
+    //       className: 'cm-fullWidth',
+    //       title: '按住Ctrl/Cmd点击切换成半角（Hold down Ctrl/Cmd and click to switch to half-width）',
+    //     });
+    //   }
+    // }
   }
 
   /**
-   *
-   * @param {CodeMirror.Editor} codemirror
+   * 将全角符号转换为半角符号
+   * @param {EditorView} editorView
    * @param {MouseEvent} evt
    */
-  toHalfWidth(codemirror, evt) {
+  toHalfWidth(editorView, evt) {
     const { target } = evt;
     if (!(target instanceof HTMLElement)) {
       return;
@@ -247,34 +251,44 @@ export default class Editor {
     if (target.classList.contains('cm-fullWidth') && (evt.ctrlKey || evt.metaKey) && evt.buttons === 1) {
       const rect = target.getBoundingClientRect();
       // 由于是一个字符，所以肯定在一行
-      const from = codemirror.coordsChar({ left: rect.left, top: rect.top });
-      const to = { line: from.line, ch: from.ch + 1 };
-      codemirror.setSelection(from, to);
-      codemirror.replaceSelection(
-        target.innerText
-          .replace('·', '`')
-          .replace('￥', '$')
-          .replace('、', '/')
-          .replace('：', ':')
-          .replace('“', '"')
-          .replace('”', '"')
-          .replace('【', '[')
-          .replace('】', ']')
-          .replace('（', '(')
-          .replace('）', ')')
-          .replace('《', '<')
-          .replace('》', '>'),
-      );
+      const pos = editorView.posAtCoords({ x: rect.left, y: rect.top });
+      if (!pos) {
+        return;
+      }
+      const from = pos;
+      const to = from + 1;
+
+      const transaction = editorView.state.update({
+        changes: {
+          from,
+          to,
+          insert: target.innerText
+            .replace('·', '`')
+            .replace('￥', '$')
+            .replace('、', '/')
+            .replace('：', ':')
+            .replace('"', '"')
+            .replace('"', '"')
+            .replace('【', '[')
+            .replace('】', ']')
+            .replace('（', '(')
+            .replace('）', ')')
+            .replace('《', '<')
+            .replace('》', '>'),
+        },
+      });
+
+      editorView.dispatch(transaction);
     }
   }
   /**
    *
    * @param {KeyboardEvent} e
-   * @param {CodeMirror.Editor} codemirror
+   * @param {EditorView} editor
    */
-  onKeyup = (e, codemirror) => {
-    const { line: targetLine } = codemirror.getCursor();
-    this.previewer.highlightLine(targetLine + 1);
+  onKeyup = (e, editor) => {
+    const targetLine = editor.state.doc.lineAt(editor.state.selection.ranges[0].from).number;
+    this.previewer.highlightLine(targetLine);
   };
 
   /**
@@ -378,15 +392,15 @@ export default class Editor {
 
   /**
    *
-   * @param {CodeMirror.Editor} codemirror
+   * @param {EditorView} editorView
    */
-  onScroll = (codemirror) => {
+  onScroll = (editorView) => {
     this.$cherry.$event.emit('cleanAllSubMenus'); // 滚动时清除所有子菜单，这不应该在Bubble中处理，我们关注的是编辑器的滚动  add by ufec
     if (this.disableScrollListener) {
       this.disableScrollListener = false;
       return;
     }
-    const scroller = codemirror.getScrollerElement();
+    const scroller = editorView.scrollDOM;
     if (scroller.scrollTop <= 0) {
       this.previewer.scrollToLineNum(0);
       return;
@@ -395,28 +409,30 @@ export default class Editor {
       this.previewer.scrollToLineNum(null); // 滚动到底
       return;
     }
-    const currentTop = codemirror.getScrollInfo().top;
-    const targetLine = codemirror.lineAtHeight(currentTop, 'local');
-    const lineRect = codemirror.charCoords({ line: targetLine, ch: 0 }, 'local');
-    const lineHeight = codemirror.getLineHandle(targetLine).height;
-    const lineTop = lineRect.bottom - lineHeight; // 直接用lineRect.top在自动折行时计算的是最后一行的top
-    const percent = (100 * (currentTop - lineTop)) / lineHeight / 100;
-    // console.log(percent);
-    // codemirror中行号以0开始，所以需要+1
-    this.previewer.scrollToLineNum(targetLine + 1, percent);
+    const { scrollTop } = scroller;
+    const lineBlock = editorView.lineBlockAtHeight(scrollTop);
+    const lineNumber = editorView.state.doc.lineAt(lineBlock.from).number;
+    this.previewer.scrollToLineNum(lineNumber, 0);
   };
 
   /**
    *
-   * @param {CodeMirror.Editor} codemirror
+   * @param {EditorView} editorView
    * @param {MouseEvent} evt
    */
-  onMouseDown = (codemirror, evt) => {
+  onMouseDown = (editorView, evt) => {
     this.$cherry.$event.emit('cleanAllSubMenus'); // Bubble中处理需要考虑太多，直接在编辑器中处理可包括Bubble中所有情况，因为产生Bubble的前提是光标在编辑器中 add by ufec
-    const { line: targetLine } = codemirror.getCursor();
-    const top = Math.abs(evt.y - codemirror.getWrapperElement().getBoundingClientRect().y);
-    this.previewer.scrollToLineNumWithOffset(targetLine + 1, top);
-    this.toHalfWidth(codemirror, evt);
+    // 获取光标位置
+    const cursorPosition = editorView.state.selection.main.head;
+
+    // 获取对应的行号（从0开始）
+    const targetLine = editorView.state.doc.lineAt(cursorPosition).number;
+
+    const top = Math.abs(evt.y - editorView.dom.getBoundingClientRect().y);
+
+    this.previewer.scrollToLineNumWithOffset(targetLine, top);
+
+    this.toHalfWidth(editorView, evt);
   };
 
   /**
@@ -435,7 +451,27 @@ export default class Editor {
     if (!(textArea instanceof HTMLTextAreaElement)) {
       throw new Error('The specific element is not a textarea.');
     }
-    const editor = codemirror.fromTextArea(textArea, this.options.codemirror);
+    const editor = new EditorView({
+      parent: textArea.parentElement,
+      state: EditorState.create({
+        doc: textArea.value,
+        extensions: [
+          EditorView.updateListener.of((update) => {
+            if (update.docChanged) {
+              const {
+                state: { selection },
+              } = update;
+              const { from, to } = selection.main;
+              const docLength = update.state.doc.length;
+              this.selectAll = from === 0 && to === docLength;
+            }
+          }),
+        ],
+      }),
+      ...this.options.codemirror,
+    });
+    this.editorView = editor;
+    textArea.style.display = 'none';
     // 以下逻辑是针对\t等空白字符的处理，似乎已经不需要了，先注释掉，等有反馈了再考虑加回来
     // editor.addOverlay({
     //   name: 'invisibles',
@@ -463,50 +499,55 @@ export default class Editor {
     this.disableScrollListener = false;
 
     if (this.options.value) {
-      editor.setOption('value', this.options.value);
+      editor.dispatch({
+        changes: { from: 0, to: editor.state.doc.length, insert: this.options.value },
+      });
     }
 
-    editor.on('blur', (codemirror, evt) => {
-      this.options.onBlur(evt, codemirror);
+    editor.dom.addEventListener('blur', (evt) => {
+      console.log('blur', evt);
+      this.options.onBlur(evt, editor);
       this.$cherry.$event.emit('blur', { evt, cherry: this.$cherry });
     });
 
-    editor.on('focus', (codemirror, evt) => {
-      this.options.onFocus(evt, codemirror);
+    editor.dom.addEventListener('focus', (evt) => {
+      console.log('focus', evt);
+      this.options.onFocus(evt, editor);
       this.$cherry.$event.emit('focus', { evt, cherry: this.$cherry });
     });
 
-    editor.on('change', (codemirror, evt) => {
-      this.options.onChange(evt, codemirror);
+    editor.dom.addEventListener('change', (evt) => {
+      console.log('change', evt);
+      this.options.onChange(evt, editor);
       this.dealSpecialWords();
       if (this.options.autoSave2Textarea) {
         // @ts-ignore
         // 将codemirror里的内容回写到textarea里
-        codemirror.save();
+        editor.save();
       }
     });
 
-    editor.on('keydown', (codemirror, evt) => {
-      this.options.onKeydown(evt, codemirror);
+    editor.dom.addEventListener('keydown', (evt) => {
+      this.options.onKeydown(evt, editor);
     });
 
-    editor.on('keyup', (codemirror, evt) => {
-      this.onKeyup(evt, codemirror);
+    editor.dom.addEventListener('keyup', (evt) => {
+      this.onKeyup(evt, editor);
     });
 
-    editor.on('paste', (codemirror, evt) => {
-      this.options.onPaste.call(this, evt, codemirror);
+    editor.dom.addEventListener('paste', (evt) => {
+      this.options.onPaste.call(this, evt, editor);
     });
 
     if (this.options.autoScrollByCursor) {
-      editor.on('mousedown', (codemirror, evt) => {
+      editor.dom.addEventListener('mousedown', (evt) => {
         setTimeout(() => {
-          this.onMouseDown(codemirror, evt);
+          this.onMouseDown(editor, evt);
         });
       });
     }
 
-    editor.on('drop', (codemirror, evt) => {
+    editor.dom.addEventListener('drop', (codemirror, evt) => {
       const files = evt.dataTransfer.files || [];
       if (files && files.length > 0) {
         // 增加延时，让drop的位置变成codemirror的光标位置
@@ -535,16 +576,13 @@ export default class Editor {
       }
     });
 
-    editor.on('scroll', (codemirror) => {
-      this.options.onScroll(codemirror);
+    editor.scrollDOM.addEventListener('scroll', () => {
+      this.options.onScroll(editor);
       this.options.writingStyle === 'focus' && this.refreshWritingStatus();
     });
 
-    editor.on('cursorActivity', () => {
+    editor.dom.addEventListener('cursorActivity', () => {
       this.onCursorActivity();
-    });
-    editor.on('beforeChange', (codemirror) => {
-      this.selectAll = this.editor.getValue() === codemirror.getSelection();
     });
 
     addEvent(
@@ -562,7 +600,7 @@ export default class Editor {
 
     /**
      * @property
-     * @type {CodeMirror.Editor}
+     * @type {EditorView}
      */
     this.editor = editor;
 
@@ -577,7 +615,7 @@ export default class Editor {
     const resizeObserver = new ResizeObserver((entries) => {
       if (this.getEditorDom().offsetWidth !== this.domWidth && this.$cherry.status.editor === 'show') {
         this.domWidth = this.getEditorDom().offsetWidth;
-        this.editor.refresh();
+        this.editor.requestMeasure();
       }
     });
     resizeObserver.observe(this.getEditorDom());
@@ -586,31 +624,31 @@ export default class Editor {
   /**
    *
    * @param {number | null} beginLine 起始行，传入null时跳转到文档尾部
-   * @param {number} [endLine] 终止行
+   * @param {number} [endLine] 终止行，表示当前元素占用的行数
    * @param {number} [percent] 百分比，取值0~1
    */
   jumpToLine(beginLine, endLine, percent) {
+    // 跳转到文档尾部
     if (beginLine === null) {
       cancelAnimationFrame(this.animation.timer);
       this.disableScrollListener = true;
-      this.editor.scrollIntoView({
-        line: this.editor.lineCount() - 1,
-        ch: 1,
+      const { doc } = this.editor.state;
+      const lastLine = doc.lines;
+      this.editor.dispatch({
+        effects: EditorView.scrollIntoView(doc.line(lastLine).to, { y: 'start' }),
       });
       this.animation.timer = 0;
       return;
     }
-    const position = this.editor.charCoords({ line: beginLine, ch: 0 }, 'local');
-    let { top } = position;
-    const positionEnd = this.editor.charCoords({ line: beginLine + endLine, ch: 0 }, 'local');
-    const height = positionEnd.top - position.top;
-    top += height * percent;
+    // 根据beginLine和行高计算出滚动位置
+    const lineHeight = this.editor.defaultLineHeight;
+    const top = beginLine * lineHeight;
     this.animation.destinationTop = Math.ceil(top - 15);
     if (this.animation.timer) {
       return;
     }
     const animationHandler = () => {
-      const currentTop = this.editor.getScrollInfo().top;
+      const currentTop = this.editor.scrollDOM.scrollTop;
       const delta = this.animation.destinationTop - currentTop;
       // 100毫秒内完成动画
       const move = Math.ceil(Math.min(Math.abs(delta), Math.max(1, Math.abs(delta) / (100 / 16.7))));
@@ -621,20 +659,20 @@ export default class Editor {
           return;
         }
         this.disableScrollListener = true;
-        this.editor.scrollTo(null, currentTop + move);
+        this.editor.scrollDOM.scrollTop = currentTop + move;
       } else if (delta < 0) {
         if (currentTop <= this.animation.destinationTop || currentTop <= 0) {
           this.animation.timer = 0;
           return;
         }
         this.disableScrollListener = true;
-        this.editor.scrollTo(null, currentTop - move);
+        this.editor.scrollDOM.scrollTop = currentTop - move;
       } else {
         this.animation.timer = 0;
         return;
       }
       // 无法再继续滚动
-      if (currentTop === this.editor.getScrollInfo().top || move >= Math.abs(delta)) {
+      if (currentTop === this.editor.scrollDOM.scrollTop || move >= Math.abs(delta)) {
         this.animation.timer = 0;
         return;
       }
@@ -645,9 +683,9 @@ export default class Editor {
 
   /**
    *
-   * @param {number | null} lineNum
-   * @param {number} [endLine]
-   * @param {number} [percent]
+   * @param {number | null} lineNum 起始行号，表示当前元素的起始位置
+   * @param {number} [endLine] 行数范围，表示当前元素占用的行数
+   * @param {number} [percent] 滚动百分比，表示在当前元素内的滚动位置
    */
   scrollToLineNum(lineNum, endLine, percent) {
     if (lineNum === null) {
@@ -656,7 +694,6 @@ export default class Editor {
     }
     const $lineNum = Math.max(0, lineNum);
     this.jumpToLine($lineNum, endLine, percent);
-    Logger.log('滚动预览区域，左侧应scroll to ', $lineNum);
   }
 
   /**
@@ -673,7 +710,16 @@ export default class Editor {
    * @param {EditorEventCallback} callback 回调函数
    */
   addListener(event, callback) {
-    this.editor.on(event, callback);
+    // CodeMirror 6 使用 EditorView.updateListener 和事件分发机制
+    if (this.editor && this.editor.dispatch) {
+      if (!this.eventListeners) {
+        this.eventListeners = new Map();
+      }
+      if (!this.eventListeners.has(event)) {
+        this.eventListeners.set(event, []);
+      }
+      this.eventListeners.get(event).push(callback);
+    }
   }
 
   /**

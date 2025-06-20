@@ -73,7 +73,7 @@ export default class Engine {
     this.timer = setTimeout(() => {
       this.$cherry.lastMarkdownText = '';
       this.hashCache = {};
-      const markdownText = this.$cherry.editor.editor.getValue();
+      const markdownText = this.$cherry.editor.editorView.state.doc.toString();
       const html = this.makeHtml(markdownText);
       this.$cherry.previewer.refresh(html);
       this.$cherry.$event.emit('afterChange', {

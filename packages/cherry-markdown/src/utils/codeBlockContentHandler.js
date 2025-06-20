@@ -14,10 +14,30 @@
  * limitations under the License.
  */
 import { getCodeBlockRule } from '@/utils/regexp';
-import codemirror from 'codemirror';
+import { EditorState } from '@codemirror/state';
+import { EditorView, keymap, lineNumbers } from '@codemirror/view';
+import { defaultKeymap } from '@codemirror/commands';
+import { javascript } from '@codemirror/lang-javascript';
+import { css } from '@codemirror/lang-css';
+import { html } from '@codemirror/lang-html';
+import { markdown } from '@codemirror/lang-markdown';
+import { yaml } from '@codemirror/lang-yaml';
 import { getCodePreviewLangSelectElement } from '@/utils/code-preview-language-setting';
 import { copyToClip } from '@/utils/copy';
-import 'codemirror/keymap/sublime';
+
+// 语言映射 - 只使用已安装的语言包
+const languageMap = {
+  javascript: () => javascript(),
+  js: () => javascript(),
+  typescript: () => javascript(),
+  ts: () => javascript(),
+  css: () => css(),
+  html: () => html(),
+  markdown: () => markdown(),
+  md: () => markdown(),
+  yaml: () => yaml(),
+  yml: () => yaml(),
+};
 
 export default class CodeBlockHandler {
   /**
@@ -95,7 +115,9 @@ export default class CodeBlockHandler {
   }
   $collectCodeBlockCode() {
     const codeBlockCodes = [];
-    this.codeMirror.getValue().replace(this.codeBlockReg, function (whole, ...args) {
+    // 使用 CodeMirror 6 的 getValue 方法
+    const editorValue = this.codeMirror.editorView.state.doc.toString();
+    editorValue.replace(this.codeBlockReg, function (whole, ...args) {
       const match = whole.replace(/^\n*/, '');
       const offsetBegin = args[args.length - 2] + whole.match(/^\n*/)[0].length;
       if (!match.startsWith('```mermaid')) {
@@ -109,29 +131,63 @@ export default class CodeBlockHandler {
   }
   $setBlockSelection(index) {
     const codeBlockCode = this.codeBlockEditor.codeBlockCodes[index];
-    const whole = this.codeMirror.getValue();
+    // 使用 CodeMirror 6 的 getValue 方法
+    const whole = this.codeMirror.editorView.state.doc.toString();
     const beginLine = whole.slice(0, codeBlockCode.offset).match(/\n/g)?.length ?? 0;
     const endLine = beginLine + codeBlockCode.code.match(/\n/g).length;
     const endCh = codeBlockCode.code.slice(0, -3).match(/[^\n]+\n*$/)[0].length;
-    // 从下往上选中内容，这样当代码块内容很多时，选中整个代码块不会触发滚动条滚动
-    this.codeBlockEditor.info.selection = [
-      { line: endLine - 1, ch: endCh },
-      { line: beginLine + 1, ch: 0 },
-    ];
-    this.codeMirror.setSelection(...this.codeBlockEditor.info.selection);
+
+    // CodeMirror 6 选择方式
+    if (this.codeMirror.editorView) {
+      const view = this.codeMirror.editorView;
+      const doc = view.state.doc;
+      const startLine = doc.line(beginLine + 2); // +2 因为跳过第一行的 ```
+      const endLineObj = doc.line(endLine);
+      const from = startLine.from;
+      const to = endLineObj.from + endCh;
+
+      view.dispatch({
+        selection: { anchor: to, head: from },
+        scrollIntoView: true,
+      });
+    } else {
+      // 兼容 CodeMirror 5
+      this.codeBlockEditor.info.selection = [
+        { line: endLine - 1, ch: endCh },
+        { line: beginLine + 1, ch: 0 },
+      ];
+      this.codeMirror.setSelection(...this.codeBlockEditor.info.selection);
+    }
   }
   $setLangSelection(index) {
     const codeBlockCode = this.codeBlockEditor.codeBlockCodes[index];
-    const whole = this.codeMirror.getValue();
+    // 使用 CodeMirror 6 的 getValue 方法
+    const whole = this.codeMirror.editorView.state.doc.toString();
     const beginLine = whole.slice(0, codeBlockCode.offset).match(/\n/g)?.length ?? 0;
     const firstLine = codeBlockCode.code.match(/```\s*[^\n]+/)[0] ?? '```';
     const beginCh = 3;
-    const endLine = firstLine.length;
-    this.codeBlockEditor.info.selection = [
-      { line: beginLine, ch: beginCh },
-      { line: beginLine, ch: endLine },
-    ];
-    this.codeMirror.setSelection(...this.codeBlockEditor.info.selection);
+    const endCh = firstLine.length;
+
+    // CodeMirror 6 选择方式
+    if (this.codeMirror.editorView) {
+      const view = this.codeMirror.editorView;
+      const doc = view.state.doc;
+      const lineObj = doc.line(beginLine + 1);
+      const from = lineObj.from + beginCh;
+      const to = lineObj.from + endCh;
+
+      view.dispatch({
+        selection: { anchor: from, head: to },
+        scrollIntoView: true,
+      });
+    } else {
+      // 兼容 CodeMirror 5
+      this.codeBlockEditor.info.selection = [
+        { line: beginLine, ch: beginCh },
+        { line: beginLine, ch: endCh },
+      ];
+      this.codeMirror.setSelection(...this.codeBlockEditor.info.selection);
+    }
   }
   showBubble(isEnableBubbleAndEditorShow = true) {
     this.$updateContainerPosition();
@@ -274,39 +330,92 @@ export default class CodeBlockHandler {
    */
   $changeLang(lang) {
     this.$findCodeInEditor(true);
-    this.codeMirror.replaceSelection(lang, 'around');
+    // 使用 CodeMirror 6 的 replaceSelection 方法
+    if (this.codeMirror.editorView) {
+      const view = this.codeMirror.editorView;
+      const selection = view.state.selection.main;
+      view.dispatch({
+        changes: { from: selection.from, to: selection.to, insert: lang },
+        selection: { anchor: selection.from + lang.length },
+      });
+    } else {
+      // 兼容 CodeMirror 5
+      this.codeMirror.replaceSelection(lang, 'around');
+    }
   }
   $drawEditor() {
     const dom = document.createElement('div');
     dom.className = 'cherry-previewer-codeBlock-content-handler__input';
-    const input = document.createElement('textarea');
-    input.id = 'codeMirrorEditor';
-    dom.appendChild(input);
-    const editorInstance = codemirror.fromTextArea(input, {
-      mode: '',
-      theme: 'default',
-      scrollbarStyle: 'null', // 取消滚动动画
-      lineNumbers: true, // 显示行号
-      autofocus: true, // 自动对焦
-      lineWrapping: true, // 自动换行
-      cursorHeight: 0.85, // 光标高度，0.85好看一些
-      indentUnit: 4, // 缩进单位为4
-      tabSize: 4, // 一个tab转换成的空格数量
-      keyMap: 'sublime',
+
+    // 获取当前选中的代码内容
+    const selectedCode = this.codeMirror.editorView
+      ? this.codeMirror.editorView.state.sliceDoc(
+          this.codeMirror.editorView.state.selection.main.from,
+          this.codeMirror.editorView.state.selection.main.to,
+        )
+      : this.codeMirror.getSelection();
+
+    // 提取语言类型
+    const langMatch = selectedCode.match(/```(\w+)/);
+    const language = langMatch ? langMatch[1] : '';
+
+    // 创建 CodeMirror 6 编辑器
+    const extensions = [
+      lineNumbers(),
+      keymap.of([...defaultKeymap]),
+      EditorView.lineWrapping,
+      EditorView.theme({
+        '&': { height: '100%' },
+        '.cm-content': { padding: '10px' },
+        '.cm-focused': { outline: 'none' },
+        '.cm-scroller': { fontFamily: 'inherit', lineHeight: '27px' },
+      }),
+    ];
+
+    // 根据语言添加语法高亮
+    if (language && languageMap[language.toLowerCase()]) {
+      extensions.push(languageMap[language.toLowerCase()]());
+    }
+
+    // 创建更新监听器
+    const updateListener = EditorView.updateListener.of((update) => {
+      if (update.docChanged) {
+        // 更新主编辑器内容
+        const currentContent = update.state.doc.toString();
+        if (this.codeMirror.editorView) {
+          const view = this.codeMirror.editorView;
+          const selection = view.state.selection.main;
+          view.dispatch({
+            changes: {
+              from: selection.from,
+              to: selection.to,
+              insert: currentContent,
+            },
+          });
+        } else {
+          // 兼容 CodeMirror 5
+          this.codeMirror.replaceSelection(currentContent, 'around');
+        }
+      }
     });
-    const editor = this.codeMirror;
-    editorInstance.on('change', () => {
-      editor.replaceSelection(editorInstance.getValue(), 'around');
+
+    const startState = EditorState.create({
+      doc: selectedCode,
+      extensions: extensions.concat([updateListener]),
     });
+
+    const editorInstance = new EditorView({
+      state: startState,
+      parent: dom,
+    });
+
     this.codeBlockEditor.editorDom.inputDiv = dom;
     this.codeBlockEditor.editorDom.inputDom = editorInstance;
     this.$updateEditorPosition();
     this.container.appendChild(this.codeBlockEditor.editorDom.inputDiv);
-    this.codeBlockEditor.editorDom.inputDom.focus();
-    this.codeBlockEditor.editorDom.inputDom.refresh();
-    editorInstance.setValue(this.codeMirror.getSelection());
-    // 去掉下面的逻辑，因为在代码块比较高时，强制让光标定位在最后会让页面出现跳跃的情况
-    // editorInstance.setCursor(Number.MAX_VALUE, Number.MAX_VALUE); // 指针设置至CodeBlock末尾
+
+    // 聚焦编辑器
+    editorInstance.focus();
   }
 
   /**
@@ -369,7 +478,7 @@ export default class CodeBlockHandler {
   $updateEditorPosition() {
     this.$setInputOffset();
     const spanStyle = getComputedStyle(this.codeBlockEditor.info.codeBlockNode);
-    const editorWrapper = this.codeBlockEditor.editorDom.inputDom.getWrapperElement();
+    const editorWrapper = this.codeBlockEditor.editorDom.inputDom.dom;
     this.setStyle(editorWrapper, 'fontSize', spanStyle.fontSize || '16px');
     this.setStyle(editorWrapper, 'fontFamily', spanStyle.fontFamily);
     this.setStyle(editorWrapper, 'lineHeight', '1.8em');

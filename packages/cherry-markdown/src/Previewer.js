@@ -361,7 +361,7 @@ export default class Previewer {
       this.options.previewerMaskDom.classList.remove('cherry-previewer-mask--show');
       this.options.virtualDragLineDom.classList.remove('cherry-drag--show');
       // 刷新codemirror宽度
-      this.editor.editor.refresh();
+      this.editor.editor.requestMeasure();
       // 取消事件绑定
       removeEvent(document, 'mousemove', dragLineMouseMove, false);
       removeEvent(document, 'mouseup', dragLineMouseUp, false);
@@ -459,6 +459,9 @@ export default class Previewer {
       // console.log('destLine:', lines, percent,
       //  mdRect.height + marginTop + marginBottom, mdOffsetTop, mdElement);
       // if(mdOffsetTop < 0) {
+      // lines - lineNum: 起始行号，表示当前元素的起始位置
+      // lineNum: 行数范围，表示当前元素占用的行数
+      // percent: 滚动百分比，表示在当前元素内的滚动位置
       return this.editor.scrollToLineNum(lines - lineNum, lineNum, percent);
       // }
       // return this.editor.scrollToLineNum(lines - lineNum, 0, 0);
@@ -768,7 +771,11 @@ export default class Previewer {
       previewerDom.classList.remove('cherry-previewer--hidden');
       editorDom.classList.remove('cherry-editor--full');
     }
-    setTimeout(() => this.editor.editor.refresh(), 0);
+    setTimeout(() => {
+      if (this.editor.editorView) {
+        this.editor.editorView.requestMeasure();
+      }
+    }, 0);
   }
 
   previewOnly() {
@@ -793,6 +800,7 @@ export default class Previewer {
       editorPercentage: '100%',
       previewerPercentage: '100%',
     };
+    console.log('floatPreviewer', this.editor);
     const editorWidth = this.editor.options.editorDom.getBoundingClientRect().width;
     const layout = this.calculateRealLayout(editorWidth);
     this.options.previewerCache.layout = layout;
@@ -821,7 +829,7 @@ export default class Previewer {
     this.$cherry.$event.emit('previewerOpen');
     this.$cherry.$event.emit('editorOpen');
 
-    setTimeout(() => this.editor.editor.refresh(), 0);
+    setTimeout(() => this.editor.editor.requestMeasure(), 0);
   }
 
   doHtmlCache(html) {
@@ -902,7 +910,7 @@ export default class Previewer {
 
   /**
    * 高亮预览区域对应的行
-   * @param {Number} lineNum
+   * @param {Number} lineNum 行号（从1开始）
    */
   highlightLine(lineNum) {
     const domContainer = this.getDomContainer();
@@ -934,8 +942,8 @@ export default class Previewer {
 
   /**
    * 滚动到对应行号位置并加上偏移量
-   * @param {Number} lineNum
-   * @param {Number} offset
+   * @param {Number} lineNum 行号（从1开始）
+   * @param {Number} offset 偏移量
    */
   scrollToLineNumWithOffset(lineNum, offset) {
     const top = this.$getTopByLineNum(lineNum) - offset;
@@ -1098,6 +1106,11 @@ export default class Previewer {
     this.animation.timer = requestAnimationFrame(animationHandler);
   }
 
+  /**
+   * 滚动到指定行号
+   * @param {Number} lineNum 行号
+   * @param {Number} linePercent 行号百分比
+   */
   scrollToLineNum(lineNum, linePercent) {
     const top = this.$getTopByLineNum(lineNum, linePercent);
     this.$scrollAnimation(top);

@@ -297,7 +297,12 @@ export default class MenuBase {
   fire(event, shortKey = '') {
     event?.stopPropagation();
     if (typeof this.onClick === 'function') {
-      const selections = this.editor.editor.getSelections();
+      const selections = [
+        this.editor.editorView.state.doc.sliceString(
+          this.editor.editorView.state.selection.main.from,
+          this.editor.editorView.state.selection.main.to,
+        ),
+      ];
       // 判断是不是多选
       this.isSelections = selections.length > 1;
       // 当onClick返回null、undefined、false时，维持原样
@@ -313,13 +318,13 @@ export default class MenuBase {
               const safeResults = resolvedResults.map((result, index) =>
                 result === undefined || result === null ? selections[index] : String(result),
               );
-              this.editor.editor.replaceSelections(safeResults, 'around');
+              this.editor.editorView.dispatch(this.editor.editorView.state.replaceSelection(safeResults[0]));
               this.editor.editor.focus();
               this.$afterClick();
             },
           );
         } else {
-          this.editor.editor.replaceSelections(results, 'around');
+          this.editor.editorView.dispatch(this.editor.editorView.state.replaceSelection(results[0]));
           this.editor.editor.focus();
           this.$afterClick();
         }
@@ -331,12 +336,14 @@ export default class MenuBase {
    * 获取当前选择区域的range
    */
   $getSelectionRange() {
-    const { anchor, head } = this.editor.editor.listSelections()[0];
-    // 如果begin在end的后面
-    if ((anchor.line === head.line && anchor.ch > head.ch) || anchor.line > head.line) {
-      return { begin: head, end: anchor };
+    const { from, to } = this.editor.editorView.state.selection.main;
+    console.log('xyxlog getSelectionRange', from, to);
+    const fromLine = this.editor.editorView.state.doc.lineAt(from).number;
+    const toLine = this.editor.editorView.state.doc.lineAt(to).number;
+    if ((fromLine === toLine && from > to) || fromLine > toLine) {
+      return { begin: { line: toLine - 1, ch: to }, end: { line: fromLine - 1, ch: from } };
     }
-    return { begin: anchor, end: head };
+    return { begin: { line: fromLine - 1, ch: from }, end: { line: toLine - 1, ch: to } };
   }
 
   /**
@@ -372,9 +379,16 @@ export default class MenuBase {
         : begin.ch + lessBefore.length;
     const newBegin = { line: newBeginLine, ch: newBeginCh };
     const newEndLine = lessAfter.match(/\n/g)?.length > 0 ? end.line - lessAfter.match(/\n/g).length : end.line;
-    const newEndCh = lessAfter.match(/\n/g)?.length > 0 ? cm.getLine(newEndLine).length : end.ch - lessAfter.length;
+    const newEndCh =
+      lessAfter.match(/\n/g)?.length > 0 ? cm.state.doc.lineAt(newEndLine).length : end.ch - lessAfter.length;
     const newEnd = { line: newEndLine, ch: newEndCh };
-    cm.setSelection(newBegin, newEnd);
+    console.log('xyxlog setLessSelection', { begin, end, newBegin, newEnd });
+    cm.dispatch({
+      selection: {
+        anchor: newBegin.ch,
+        head: newEnd.ch,
+      },
+    });
   }
 
   /**
@@ -386,6 +400,7 @@ export default class MenuBase {
   getMoreSelection(appendBefore, appendAfter, cb) {
     const cm = this.editor.editor;
     const { begin, end } = this.$getSelectionRange();
+    console.log('xyxlog getMoreSelection', { begin, end });
     let newBeginCh =
       // 如果只包含换行，则起始位置一定是0
       /\n/.test(appendBefore) ? 0 : begin.ch - appendBefore.length;
@@ -397,17 +412,24 @@ export default class MenuBase {
     let newEndCh = end.ch;
     if (/\n/.test(appendAfter)) {
       newEndLine = end.line + appendAfter.match(/\n/g).length;
-      newEndCh = cm.getLine(newEndLine)?.length;
+      newEndCh = cm.state.doc.lineAt(newEndLine).length;
     } else {
       newEndCh =
-        cm.getLine(end.line).length < end.ch + appendAfter.length
-          ? cm.getLine(end.line).length
+        cm.state.doc.lineAt(end.line).length < end.ch + appendAfter.length
+          ? cm.state.doc.lineAt(end.line).length
           : end.ch + appendAfter.length;
     }
     const newEnd = { line: newEndLine, ch: newEndCh };
-    cm.setSelection(newBegin, newEnd);
+    cm.dispatch({
+      selection: {
+        anchor: newBegin.ch,
+        head: newEnd.ch,
+      },
+    });
     if (cb() === false) {
-      cm.setSelection(begin, end);
+      cm.dispatch({
+        selection: { anchor: begin.ch, head: end.ch },
+      });
     }
   }
 
@@ -430,15 +452,31 @@ export default class MenuBase {
     // 获取光标所在行的内容，同时选中所在行
     if (type === 'line') {
       const { begin, end } = this.$getSelectionRange();
-      cm.setSelection({ line: begin.line, ch: 0 }, { line: end.line, ch: cm.getLine(end.line).length });
-      return cm.getSelection();
+      const startLine = cm.state.doc.line(begin.line + 1);
+      const endLine = cm.state.doc.line(end.line + 1);
+      cm.dispatch({
+        selection: {
+          anchor: startLine.from,
+          head: endLine.to,
+        },
+      });
+      return cm.state.sliceDoc(startLine.from, endLine.to);
     }
     // 获取光标所在单词的内容，同时选中所在单词
     if (type === 'word') {
-      const { anchor: begin, head: end } = cm.findWordAt(cm.getCursor());
-      cm.setSelection(begin, end);
-      return cm.getSelection();
+      const cursor = cm.state.selection.main.head;
+      const word = cm.state.wordAt(cursor);
+      if (word) {
+        cm.dispatch({
+          selection: {
+            anchor: word.from,
+            head: word.to,
+          },
+        });
+        return cm.state.sliceDoc(word.from, word.to);
+      }
     }
+    return '';
   }
 
   /**

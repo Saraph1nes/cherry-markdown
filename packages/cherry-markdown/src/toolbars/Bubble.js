@@ -48,7 +48,8 @@ export default class Bubble extends Toolbar {
     this.bubbleDom = this.options.dom;
     this.editorDom = this.options.editor.getEditorDom();
     this.initBubbleDom();
-    this.editorDom.querySelector('.CodeMirror').appendChild(this.bubbleDom);
+    const editorContainer = this.editorDom.querySelector('.cm-editor') || this.editorDom;
+    editorContainer.appendChild(this.bubbleDom);
     Object.entries(this.shortcutKeyMap).forEach(([key, value]) => {
       this.$cherry.toolbar.shortcutKeyMap[key] = value;
     });
@@ -161,74 +162,57 @@ export default class Bubble extends Toolbar {
   }
 
   addSelectionChangeListener() {
-    this.options.editor.addListener('change', (codemirror) => {
-      // 当编辑区内容变更时自动隐藏bubble工具栏
+    console.log('this.options.editor =>', this.options.editor);
+    // 监听编辑器内容变更,隐藏bubble工具栏
+    this.options.editor.editor.dom.addEventListener('input', () => {
       this.hideBubble();
     });
-    this.options.editor.addListener('refresh', (codemirror) => {
-      // 当编辑区内容刷新时自动隐藏bubble工具栏
+
+    // 监听编辑器刷新,隐藏bubble工具栏
+    this.options.editor.editor.dom.addEventListener('refresh', () => {
       this.hideBubble();
     });
-    this.options.editor.addListener('scroll', (codemirror) => {
-      // 当编辑区滚动时，需要实时同步bubble工具栏的位置
+
+    // 监听编辑器滚动,同步bubble工具栏位置
+    this.options.editor.editor.dom.addEventListener('scroll', () => {
       this.updatePositionWhenScroll();
     });
-    this.options.editor.addListener('beforeSelectionChange', (codemirror, info) => {
-      setTimeout(() => {
-        const selections = codemirror.getSelections();
-        const selectionStr = selections.join('');
-        if (selectionStr !== this.lastSelectionsStr && (selectionStr || this.lastSelectionsStr)) {
-          this.lastSelections = !this.lastSelections ? [] : this.lastSelections;
-          this.$cherry.$event.emit('selectionChange', { selections, lastSelections: this.lastSelections, info });
-          this.lastSelections = selections;
-          this.lastSelectionsStr = selectionStr;
-        }
-      }, 10);
-      // 当编辑区选中内容改变时，需要展示/隐藏bubble工具栏，并计算工具栏位置
-      if (info.origin !== '*mouse' && (info.origin !== null || typeof info.origin === 'undefined')) {
-        return true;
+
+    // 监听选区变化
+    this.options.editor.editor.dom.addEventListener('beforeSelectionChange', () => {
+      console.log('xyxlog selectionSet');
+      const { state } = this.options.editor;
+      const selection = state.selection.main;
+      const selectionStr = state.sliceDoc(selection.from, selection.to);
+
+      if (selectionStr !== this.lastSelectionsStr && (selectionStr || this.lastSelectionsStr)) {
+        const selections = [selectionStr];
+        this.lastSelections = !this.lastSelections ? [] : this.lastSelections;
+        this.$cherry.$event.emit('selectionChange', { selections, lastSelections: this.lastSelections });
+        this.lastSelections = selections;
+        this.lastSelectionsStr = selectionStr;
       }
-      if (!info.ranges[0]) {
-        return true;
+
+      // 处理bubble工具栏显示/隐藏
+      if (selectionStr.length <= 0) {
+        this.hideBubble();
+        return;
       }
-      const anchor = info.ranges[0].anchor.line * 1000000 + info.ranges[0].anchor.ch;
-      const head = info.ranges[0].head.line * 1000000 + info.ranges[0].head.ch;
-      let direction = 'asc';
-      if (anchor > head) {
-        direction = 'desc';
+
+      const editorPosition = this.editorDom.getBoundingClientRect();
+      const selectionPosition = this.options.editor.coordsAtPos(selection.from);
+      const selectionEndPosition = this.options.editor.coordsAtPos(selection.to);
+
+      if (!selectionPosition || !selectionEndPosition) {
+        this.hideBubble();
+        return;
       }
-      setTimeout(() => {
-        const selections = codemirror.getSelections();
-        if (selections.join('').length <= 0) {
-          this.hideBubble();
-          return;
-        }
-        const selectedObjs = codemirror.getWrapperElement().getElementsByClassName('CodeMirror-selected');
-        const editorPosition = this.editorDom.getBoundingClientRect();
-        let width = 0;
-        let top = 0;
-        if (typeof selectedObjs !== 'object' || selectedObjs.length <= 0) {
-          this.hideBubble();
-          return;
-        }
-        for (let key = 0; key < selectedObjs.length; key++) {
-          const one = selectedObjs[key];
-          const position = one.getBoundingClientRect();
-          const targetTop = position.top - editorPosition.top;
-          if (direction === 'asc') {
-            if (targetTop >= top) {
-              top = targetTop;
-              width = position.left - editorPosition.left + position.width / 2;
-            }
-          } else {
-            if (targetTop <= top || top <= 0) {
-              top = targetTop;
-              width = position.left - editorPosition.left + position.width / 2;
-            }
-          }
-        }
-        this.showBubble(top, width);
-      }, 10);
+
+      const top = selectionPosition.top - editorPosition.top;
+      const width =
+        selectionEndPosition.left - editorPosition.left + (selectionEndPosition.right - selectionEndPosition.left) / 2;
+
+      this.showBubble(top, width);
     });
   }
 }

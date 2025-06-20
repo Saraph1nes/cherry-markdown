@@ -1,4 +1,3 @@
-import { mac } from 'codemirror/src/util/browser';
 import {
   getAllowedShortcutKey,
   keyStackIsModifierkeys,
@@ -12,6 +11,10 @@ import {
   storageKeyMap,
 } from '@/utils/shortcutKey';
 import { createElement } from '@/utils/dom';
+
+// 原生检测Mac平台
+const mac = typeof navigator !== 'undefined' ? /Mac/.test(navigator.platform) : false;
+
 /**
  * 隐藏输入框，展示快捷键配置项
  * @param {Element} inputWrapper

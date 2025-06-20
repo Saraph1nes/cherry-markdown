@@ -226,7 +226,7 @@ export default class PreviewerBubble {
     this.checkboxIdx = list.indexOf(target);
 
     // 然后找到Editor中对应的`- []`或者`- [ ]`进行修改
-    const contents = getValueWithoutCode(this.editor.editor.getValue()).split('\n');
+    const contents = getValueWithoutCode(this.editor.editorView.state.doc.toString()).split('\n');
 
     let editorCheckboxCount = 0;
     // [ ]中的空格，或者[x]中的x的位置
@@ -247,8 +247,23 @@ export default class PreviewerBubble {
       // 无法找到对应的checkbox
       return;
     }
-    this.editor.editor.setSelection({ line: targetLine, ch: targetCh }, { line: targetLine, ch: targetCh + 1 });
-    this.editor.editor.replaceSelection(this.editor.editor.getSelection() === ' ' ? 'x' : ' ', 'around');
+
+    // 计算目标位置的文档位置
+    const line = this.editor.editorView.state.doc.line(targetLine + 1);
+    const from = line.from + targetCh;
+    const to = from + 1;
+
+    // 获取当前字符
+    const currentChar = this.editor.editorView.state.sliceDoc(from, to);
+
+    // 创建更新事务
+    this.editor.editorView.dispatch({
+      changes: {
+        from,
+        to,
+        insert: currentChar === ' ' ? 'x' : ' ',
+      },
+    });
   }
 
   /**
@@ -287,10 +302,16 @@ export default class PreviewerBubble {
           xmlData,
           (newData) => {
             const { xmlData, base64 } = newData;
-            this.editor.editor.replaceSelection(
-              `(${base64}){data-type=drawio data-xml=${encodeURI(xmlData)}}`,
-              'around',
-            );
+            const view = this.editor.editorView;
+            const { state } = view;
+            const selection = state.selection.main;
+            view.dispatch({
+              changes: {
+                from: selection.from,
+                to: selection.to,
+                insert: `(${base64}){data-type=drawio data-xml=${encodeURI(xmlData)}}`,
+              },
+            });
           },
         );
         return;
@@ -596,7 +617,7 @@ export default class PreviewerBubble {
     const allDrawioImgs = Array.from(this.previewerDom.querySelectorAll('img[data-type="drawio"]'));
     const totalDrawioImgs = allDrawioImgs.length;
     const drawioImgIndex = allDrawioImgs.indexOf(htmlElement);
-    const content = getValueWithoutCode(this.editor.editor.getValue());
+    const content = getValueWithoutCode(this.editor.editorView.state.doc.toString());
     const drawioImgsCode = content.match(imgDrawioReg);
     const testSrc = drawioImgsCode[drawioImgIndex]
       ? drawioImgsCode[drawioImgIndex].replace(/^!\[.*?\]\((.*?)\)/, '$1').trim()
@@ -615,7 +636,17 @@ export default class PreviewerBubble {
           if (testIndex === drawioImgIndex) {
             endCh = beginCh + targetString.length;
             beginCh += targetString.replace(/^(!\[[^\]]*])[^\n]*$/, '$1').length;
-            this.editor.editor.setSelection({ line, ch: beginCh }, { line, ch: endCh });
+            // 计算目标位置的文档位置
+            const docLine = this.editor.editorView.state.doc.line(line + 1);
+            const from = docLine.from + beginCh;
+            const to = docLine.from + endCh;
+            // 创建更新事务
+            this.editor.editorView.dispatch({
+              selection: {
+                anchor: from,
+                head: to,
+              },
+            });
             // 更新后需要再调用一次markText机制
             this.editor.dealSpecialWords();
             return true;
@@ -642,7 +673,7 @@ export default class PreviewerBubble {
    * @returns {boolean}
    */
   beginChangeImgValue(htmlElement) {
-    const content = getValueWithoutCode(this.editor.editor.getValue());
+    const content = getValueWithoutCode(this.editor.editorView.state.doc.toString());
     const src = htmlElement.getAttribute('src');
     const imgReg = /(!\[[^\n]*?\]\([^)]+\))/g;
     const contentImgs = content.match(imgReg);
@@ -667,7 +698,17 @@ export default class PreviewerBubble {
             this.imgAppend = imgAppendReg.test(targetString) ? targetString.replace(imgAppendReg, '$1') : false;
             beginCh += targetString.replace(/^(!\[[^#\]]*).*$/, '$1').length;
             endCh = beginCh + targetString.replace(/^(!\[[^#\]]*)([^\]]*?)\].*$/, '$2').length;
-            this.editor.editor.setSelection({ line, ch: beginCh }, { line, ch: endCh });
+            // 计算目标位置的文档位置
+            const docLine = this.editor.editorView.state.doc.line(line + 1);
+            const from = docLine.from + beginCh;
+            const to = docLine.from + endCh;
+            // 创建更新事务
+            this.editor.editorView.dispatch({
+              selection: {
+                anchor: from,
+                head: to,
+              },
+            });
             return true;
           }
           testIndex += 1;
@@ -692,10 +733,16 @@ export default class PreviewerBubble {
    */
   changeImgValue(htmlElement, style) {
     const append = this.imgAppend ? ` ${this.imgAppend}` : '';
-    this.editor.editor.replaceSelection(
-      `#${Math.round(style.width)}px #${Math.round(style.height)}px${append}`,
-      'around',
-    );
+    const text = `#${Math.round(style.width)}px #${Math.round(style.height)}px${append}`;
+    const { state } = this.editor.editorView;
+    const { from, to } = state.selection.main;
+    this.editor.editorView.dispatch({
+      changes: {
+        from,
+        to,
+        insert: text,
+      },
+    });
   }
 
   /**

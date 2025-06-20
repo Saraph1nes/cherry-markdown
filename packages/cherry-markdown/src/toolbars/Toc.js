@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import { EditorView } from '@codemirror/view';
 import { createElement } from '../utils/dom';
+import { StateEffect } from '@codemirror/state';
 /**
  * 悬浮目录
  */
@@ -21,6 +23,7 @@ export default class Toc {
   constructor(options) {
     this.$cherry = options.$cherry;
     this.editor = options.$cherry.editor.editor;
+    this.editorView = options.$cherry.editor.editorView;
     this.tocStr = '';
     this.updateLocationHash = options.updateLocationHash ?? true;
     this.defaultModel = options.defaultModel ?? 'full';
@@ -35,12 +38,17 @@ export default class Toc {
     this.timer = setTimeout(() => {
       this.updateTocList();
     }, 300);
-    this.editor.on('change', (codemirror, evt) => {
-      clearTimeout(this.timer);
-      this.timer = setTimeout(() => {
-        this.updateTocList();
-        this.$switchModel(this.model);
-      }, 300);
+    const updateListener = EditorView.updateListener.of((update) => {
+      if (update.docChanged) {
+        clearTimeout(this.timer);
+        this.timer = setTimeout(() => {
+          this.updateTocList();
+          this.$switchModel(this.model);
+        }, 300);
+      }
+    });
+    this.editorView.dispatch({
+      effects: StateEffect.appendConfig.of(updateListener),
     });
     this.$switchModel(this.getModelFromLocalStorage());
   }
@@ -131,8 +139,13 @@ export default class Toc {
         this.$switchModel(this.model);
       });
     }
-    this.editor.on('scroll', (codemirror, evt) => {
-      this.updateTocList(true);
+    const scrollHandler = EditorView.domEventHandlers({
+      scroll: (event, view) => {
+        this.updateTocList(true);
+      },
+    });
+    this.editorView.dispatch({
+      effects: StateEffect.appendConfig.of(scrollHandler),
     });
     const scrollDom = this.$cherry.previewer.getDomCanScroll();
     if (scrollDom.nodeName === 'HTML') {

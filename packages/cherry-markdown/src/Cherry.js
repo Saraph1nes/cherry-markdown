@@ -45,6 +45,8 @@ import locales from '@/locales/index';
 import { urlProcessorProxy } from './UrlCache';
 import { CherryStatic } from './CherryStatic';
 import { LIST_CONTENT } from '@/utils/regexp';
+import { EditorView } from '@codemirror/view';
+import { StateEffect } from '@codemirror/state';
 
 /** @typedef {import('~types/cherry').CherryOptions} CherryOptions */
 export default class Cherry extends CherryStatic {
@@ -209,7 +211,7 @@ export default class Cherry extends CherryStatic {
     previewer.registerAfterUpdate(this.engine.mounted.bind(this.engine));
 
     // default value init
-    this.initText(editor.editor);
+    this.initText(editor);
 
     this.$event.on('toolbarHide', () => {
       this.status.toolbar = 'hide';
@@ -422,7 +424,7 @@ export default class Cherry extends CherryStatic {
    * @returns markdown源码内容
    */
   getValue() {
-    return this.editor.editor.getValue();
+    return this.editor.editorView.state.doc.toString();
   }
 
   /**
@@ -435,10 +437,10 @@ export default class Cherry extends CherryStatic {
 
   /**
    * 获取CodeMirror 实例
-   * @returns { CodeMirror.Editor } CodeMirror实例
+   * @returns { import('@codemirror/view').EditorView } CodeMirror实例
    */
   getCodeMirror() {
-    return this.editor.editor;
+    return this.editor.editorView;
   }
 
   /**
@@ -484,16 +486,24 @@ export default class Cherry extends CherryStatic {
    * @param {boolean} keepCursor 是否保持光标位置
    */
   setValue(content, keepCursor = false) {
-    if (keepCursor === false) {
-      return this.editor.editor.setValue(content);
+    const view = this.editor.editorView;
+    if (!keepCursor) {
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: content },
+      });
+      return;
     }
-    const codemirror = this.editor.editor;
+
     const old = this.getValue();
-    const pos = codemirror.getDoc().indexFromPos(codemirror.getCursor());
+    const selection = view.state.selection.main;
+    const pos = selection.head;
     const newPos = getPosBydiffs(pos, old, content);
-    codemirror.setValue(content);
-    const cursor = codemirror.getDoc().posFromIndex(newPos);
-    codemirror.setCursor(cursor);
+
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: content },
+      selection: { anchor: newPos, head: newPos },
+    });
+
     this.editor.dealSpecialWords();
   }
 
@@ -505,11 +515,27 @@ export default class Cherry extends CherryStatic {
    * @param {boolean} [focus=true] 保持编辑器处于focus状态
    */
   insert(content, isSelect = false, anchor = false, focus = true) {
+    const view = this.editor.editorView;
+    if (!view) return;
+
     if (anchor) {
-      this.editor.editor.setSelection({ line: anchor[0], ch: anchor[1] }, { line: anchor[0], ch: anchor[1] });
+      const line = view.state.doc.line(anchor[0] + 1);
+      const pos = line.from + anchor[1];
+      view.dispatch({
+        selection: { anchor: pos, head: pos },
+      });
     }
-    this.editor.editor.replaceSelection(content, isSelect ? 'around' : 'end');
-    focus && this.editor.editor.focus();
+
+    const selection = view.state.selection.main;
+    const { from } = selection;
+    view.dispatch({
+      changes: { from, to: selection.to, insert: content },
+      selection: isSelect
+        ? { anchor: from, head: from + content.length }
+        : { anchor: from + content.length, head: from + content.length },
+    });
+
+    focus && view.focus();
   }
 
   /**
@@ -929,11 +955,11 @@ export default class Cherry extends CherryStatic {
 
   /**
    * @private
-   * @param {import('codemirror').Editor} codemirror
+   * @param {Editor} codemirror
    */
   initText(codemirror) {
     try {
-      const markdownText = codemirror.getValue();
+      const markdownText = codemirror.editorView.state.doc.toString();
       this.lastMarkdownText = markdownText;
       const html = this.engine.makeHtml(markdownText);
       this.previewer.update(html);
@@ -946,7 +972,7 @@ export default class Cherry extends CherryStatic {
   /**
    * @private
    * @param {Event} _evt
-   * @param {import('codemirror').Editor} codemirror
+   * @param {Editor} codemirror
    */
   editText(_evt, codemirror) {
     try {
@@ -956,7 +982,7 @@ export default class Cherry extends CherryStatic {
       }
       const interval = this.options.engine.global.flowSessionContext ? 10 : 50;
       this.timer = setTimeout(() => {
-        const markdownText = codemirror.getValue();
+        const markdownText = codemirror.editorView.state.doc.toString();
         if (markdownText !== this.lastMarkdownText) {
           this.lastMarkdownText = markdownText;
           const html = this.engine.makeHtml(markdownText);
@@ -968,7 +994,9 @@ export default class Cherry extends CherryStatic {
         }
         // 强制每次编辑（包括undo、redo）编辑器都会自动滚动到光标位置
         if (!this.options.editor.keepDocumentScrollAfterInit) {
-          codemirror.scrollIntoView(null);
+          codemirror.editorView.dispatch({
+            effects: [EditorView.scrollIntoView(codemirror.editorView.state.selection.main.head)],
+          });
         }
       }, interval);
     } catch (e) {
@@ -981,10 +1009,15 @@ export default class Cherry extends CherryStatic {
    * @param {any} cb
    */
   onChange(cb) {
-    this.editor.editor.on('change', (codeMirror) => {
-      cb({
-        markdown: codeMirror.getValue(), // 后续可以按需增加html或其他状态
-      });
+    const updateListener = EditorView.updateListener.of((update) => {
+      if (update.docChanged) {
+        cb({
+          markdown: update.state.doc.toString(),
+        });
+      }
+    });
+    this.editor.editorView.dispatch({
+      effects: StateEffect.appendConfig.of(updateListener),
     });
   }
 
@@ -993,19 +1026,34 @@ export default class Cherry extends CherryStatic {
    * @param {KeyboardEvent} evt
    */
   fireShortcutKey(evt) {
-    const cursor = this.editor.editor.getCursor();
-    const lineContent = this.editor.editor.getLine(cursor.line);
+    const view = this.editor.editorView;
+    const { state } = view;
+    const selection = state.selection.main;
+    const line = state.doc.lineAt(selection.head);
+    const lineContent = line.text;
+
+    console.log('fireShortcutKey', { evt, editor: this.editor, lineContent });
+
     // shift + tab 已经被绑定为缩进，所以这里不做处理
     if (!evt.shiftKey && evt.key === 'Tab' && LIST_CONTENT.test(lineContent)) {
       // 每按一次Tab，如果当前光标在行首或者行尾，就在行首加一个\t
-      if (cursor.ch === 0 || cursor.ch === lineContent.length || cursor.ch === lineContent.length + 1) {
+      const cursorCol = selection.head - line.from;
+      if (cursorCol === 0 || cursorCol === lineContent.length || cursorCol === lineContent.length + 1) {
         evt.preventDefault();
-        this.editor.editor.setSelection({ line: cursor.line, ch: 0 }, { line: cursor.line, ch: lineContent.length });
-        this.editor.editor.replaceSelection(`\t${lineContent}`, 'around');
-        const newCursor = this.editor.editor.getCursor();
-        this.editor.editor.setSelection(newCursor, newCursor);
+        view.dispatch({
+          changes: {
+            from: line.from,
+            to: line.to,
+            insert: `\t${lineContent}`,
+          },
+          selection: {
+            anchor: line.from + 1 + lineContent.length,
+            head: line.from + 1 + lineContent.length,
+          },
+        });
       }
     }
+
     if (this.toolbar.matchShortcutKey(evt)) {
       // 快捷键
       const needPreventDefault = this.toolbar.fireShortcutKey(evt);
