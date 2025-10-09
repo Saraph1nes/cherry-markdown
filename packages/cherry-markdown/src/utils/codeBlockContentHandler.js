@@ -303,7 +303,22 @@ export default class CodeBlockHandler {
     this.$updateEditorPosition();
     this.container.appendChild(this.codeBlockEditor.editorDom.inputDiv);
     this.codeBlockEditor.editorDom.inputDom.focus();
-    this.codeBlockEditor.editorDom.inputDom.refresh();
+    try {
+      if (
+        this.codeBlockEditor.editorDom.inputDom.refresh &&
+        typeof this.codeBlockEditor.editorDom.inputDom.refresh === 'function'
+      ) {
+        this.codeBlockEditor.editorDom.inputDom.refresh();
+      } else if (
+        this.codeBlockEditor.editorDom.inputDom.requestMeasure &&
+        typeof this.codeBlockEditor.editorDom.inputDom.requestMeasure === 'function'
+      ) {
+        // CodeMirror 6 equivalent
+        this.codeBlockEditor.editorDom.inputDom.requestMeasure();
+      }
+    } catch (e) {
+      console.warn('Failed to refresh code block editor:', e);
+    }
     editorInstance.setValue(this.codeMirror.getSelection());
     // 去掉下面的逻辑，因为在代码块比较高时，强制让光标定位在最后会让页面出现跳跃的情况
     // editorInstance.setCursor(Number.MAX_VALUE, Number.MAX_VALUE); // 指针设置至CodeBlock末尾

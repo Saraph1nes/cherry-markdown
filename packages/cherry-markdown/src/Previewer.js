@@ -364,7 +364,16 @@ export default class Previewer {
       this.options.previewerMaskDom.classList.remove('cherry-previewer-mask--show');
       this.options.virtualDragLineDom.classList.remove('cherry-drag--show');
       // 刷新codemirror宽度
-      this.editor.editor.refresh();
+      try {
+        if (this.editor.editor.refresh && typeof this.editor.editor.refresh === 'function') {
+          this.editor.editor.refresh();
+        } else if (this.editor.editor.requestMeasure && typeof this.editor.editor.requestMeasure === 'function') {
+          // CodeMirror 6 equivalent
+          this.editor.editor.requestMeasure();
+        }
+      } catch (e) {
+        console.warn('Failed to refresh editor in Previewer:', e);
+      }
       // 取消事件绑定
       removeEvent(document, 'mousemove', dragLineMouseMove, false);
       removeEvent(document, 'mouseup', dragLineMouseUp, false);
@@ -785,7 +794,18 @@ export default class Previewer {
           .forEach((dom) => dom.remove());
       }
     }
-    setTimeout(() => this.editor.editor.refresh(), 0);
+    setTimeout(() => {
+      try {
+        if (this.editor.editor.refresh && typeof this.editor.editor.refresh === 'function') {
+          this.editor.editor.refresh();
+        } else if (this.editor.editor.requestMeasure && typeof this.editor.editor.requestMeasure === 'function') {
+          // CodeMirror 6 equivalent
+          this.editor.editor.requestMeasure();
+        }
+      } catch (e) {
+        console.warn('Failed to refresh editor in Previewer:', e);
+      }
+    }, 0);
   }
 
   previewOnly() {
@@ -838,7 +858,18 @@ export default class Previewer {
     this.$cherry.$event.emit('previewerOpen');
     this.$cherry.$event.emit('editorOpen');
 
-    setTimeout(() => this.editor.editor.refresh(), 0);
+    setTimeout(() => {
+      try {
+        if (this.editor.editor.refresh && typeof this.editor.editor.refresh === 'function') {
+          this.editor.editor.refresh();
+        } else if (this.editor.editor.requestMeasure && typeof this.editor.editor.requestMeasure === 'function') {
+          // CodeMirror 6 equivalent
+          this.editor.editor.requestMeasure();
+        }
+      } catch (e) {
+        console.warn('Failed to refresh editor in Previewer:', e);
+      }
+    }, 0);
   }
 
   doHtmlCache(html) {
