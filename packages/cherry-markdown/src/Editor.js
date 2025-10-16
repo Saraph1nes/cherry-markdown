@@ -803,4 +803,30 @@ export default class Editor {
     );
     return selections;
   }
+
+  /**
+   * 获取当前选中的文本
+   * @returns {string}
+   */
+  getSelection() {
+    if (!this.editor) return '';
+    const selection = this.editor.state.selection.main;
+    return this.editor.state.doc.sliceString(selection.from, selection.to);
+  }
+
+  /**
+   * 设置选区
+   * @param {Object} from - 起始位置 {line: number, ch: number}
+   * @param {Object} to - 结束位置 {line: number, ch: number}
+   */
+  setSelection(from, to) {
+    if (!this.editor) return;
+    const doc = this.editor.state.doc;
+    const fromPos = doc.line(from.line + 1).from + from.ch;
+    const toPos = doc.line(to.line + 1).from + to.ch;
+    
+    this.editor.dispatch({
+      selection: EditorSelection.range(fromPos, toPos),
+    });
+  }
 }
