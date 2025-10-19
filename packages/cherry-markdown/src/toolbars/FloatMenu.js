@@ -205,7 +205,7 @@ export default class FloatMenu extends Toolbar {
   cursorActivity(evt, codeMirror) {
     const pos = codeMirror.getCursor();
     const codeMirrorLines = document.querySelector('.cherry-editor .cm-editor');
-    if (!codeMirrorLines) {
+    if (!codeMirrorLines || !(codeMirrorLines instanceof HTMLElement)) {
       return false;
     }
 
@@ -227,6 +227,10 @@ export default class FloatMenu extends Toolbar {
    * @param {HTMLElement} codeMirrorLines 编辑器 DOM 元素
    */
   calculateFloatMenuPosition(pos, codeMirror, codeMirrorLines) {
+    // 确保 codeMirrorLines 是 HTMLElement
+    if (!(codeMirrorLines instanceof HTMLElement)) {
+      return;
+    }
     try {
       const editorView = this.editor.editor;
       if (!editorView) {
@@ -351,20 +355,27 @@ export default class FloatMenu extends Toolbar {
    * @returns
    */
   getLineHeight(line, codeMirror) {
-    let height = 0;
-    // 计算到指定行（包括指定行）的位置
-    codeMirror.getDoc().eachLine(0, line, (lineObj) => {
-      height += lineObj.height;
-    });
+    // CodeMirror 6 中需要重新实现行高计算
+    const editorView = this.editor.editor;
+    if (!editorView) {
+      return line * 20; // 默认行高
+    }
 
-    // 为了让浮动菜单在当前行垂直居中，需要加上当前行高度的一半
-    // 获取当前行的高度
-    let currentLineHeight = 20; // 默认行高
-    codeMirror.getDoc().eachLine(line, line + 1, (lineObj) => {
-      currentLineHeight = lineObj.height;
-    });
+    try {
+      // 获取指定行的起始位置
+      const lineStart = editorView.state.doc.line(line + 1).from;
 
-    // 返回到当前行顶部的高度 + 当前行高度的一半，实现垂直居中
-    return height + currentLineHeight / 2;
+      // 使用 coordsAtPos 获取行坐标
+      const coords = editorView.coordsAtPos(lineStart);
+      if (coords) {
+        // 返回行顶部位置
+        return coords.top - editorView.scrollDOM.getBoundingClientRect().top;
+      }
+    } catch (error) {
+      console.warn('Error getting line height:', error);
+    }
+
+    // 降级方案：使用默认行高
+    return line * 20;
   }
 }

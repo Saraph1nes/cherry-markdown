@@ -1008,7 +1008,7 @@ export default class Cherry extends CherryStatic {
   /**
    * @private
    * @param {Event} _evt
-   * @param {import('codemirror').Editor} codemirror
+   * @param {EditorView} editorView
    */
   /**
    * 编辑器内容变更时触发，更新预览区内容

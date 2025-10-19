@@ -88,7 +88,7 @@ export default class Header extends MenuBase {
     // if (!this.isSelections && !this.$testIsHead($selection)) {
     //   this.getMoreSelection('\n', '', () => {
     //     const { from, to } = this.editor.editor.state.selection.main;
-        const newSelection = this.editor.editor.state.doc.sliceString(from, to);
+    //     const newSelection = this.editor.editor.state.doc.sliceString(from, to);
     //     const isHead = this.$testIsHead(newSelection);
     //     if (isHead) {
     //       $selection = newSelection;

@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import CodeMirror from 'codemirror';
+import { EditorView, ViewUpdate } from '@codemirror/view';
 import Cherry from '../src/Cherry.js';
 import { EditorMode } from './cherry.js';
 
 interface EditorEventMap {
-  onBlur: FocusEvent;
-  onFocus: FocusEvent;
+  onBlur: ViewUpdate;
+  onFocus: ViewUpdate;
   onKeydown: KeyboardEvent;
   onPaste: ClipboardEvent;
 }
@@ -29,13 +29,13 @@ export type EditorEventCallback<
   E = unknown,
   K extends keyof EditorEventMap = keyof EditorEventMap,
 > = E extends EditorEventMap[K]
-  ? (event: E, codemirror: CodeMirror.Editor) => void
-  : (codemirror: CodeMirror.Editor) => void;
+  ? (event: E, codemirror: EditorView) => void
+  : (codemirror: EditorView) => void;
 
 type EditorPasteEventHandler = (
   event: ClipboardEvent,
   clipboardData: ClipboardEvent['clipboardData'],
-  codemirror: CodeMirror.Editor,
+  codemirror: EditorView,
 ) => void;
 
 export type EditorConfiguration = {
@@ -53,12 +53,12 @@ export type EditorConfiguration = {
   showFullWidthMark?: boolean;
   /** 是否显示联想框 */
   showSuggestList?: boolean;
-  codemirror: CodeMirror.EditorConfiguration;
+  codemirror: any; // CodeMirror v6 配置对象
   onKeydown: EditorEventCallback<EditorEventMap['onKeydown']>;
   onFocus: EditorEventCallback<EditorEventMap['onFocus']>;
   onBlur: EditorEventCallback<EditorEventMap['onBlur']>;
   onPaste: EditorEventCallback<EditorEventMap['onPaste']>;
-  onChange: (changeList: CodeMirror.EditorChangeLinkedList, codemirror: CodeMirror.Editor) => void;
+  onChange: (update: ViewUpdate, codemirror: EditorView) => void;
   onScroll: EditorEventCallback;
   handlePaste?: EditorPasteEventHandler;
   /** 预览区域跟随编辑器光标自动滚动 */
