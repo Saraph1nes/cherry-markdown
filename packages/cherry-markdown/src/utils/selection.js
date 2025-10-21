@@ -73,7 +73,7 @@ export function getSelection(view, selection, type = 'word', focus = false) {
 
       // 如果没有选中内容，选中当前光标所在行
       const pos = Math.max(0, Math.min(range.head, doc.length - 1));
-      
+
       // 如果文档为空或只有一个字符，直接返回整个文档
       if (doc.length <= 1) {
         return doc.toString();
@@ -97,7 +97,7 @@ export function getSelection(view, selection, type = 'word', focus = false) {
   if (type === 'word') {
     try {
       const pos = Math.max(0, Math.min(range.head, doc.length - 1));
-      
+
       // 如果文档为空或只有一个字符，直接返回
       if (doc.length <= 1) {
         return doc.toString();

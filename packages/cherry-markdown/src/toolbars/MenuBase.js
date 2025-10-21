@@ -298,41 +298,71 @@ export default class MenuBase {
   /**
    * 处理菜单项点击事件
    * @param {MouseEvent | KeyboardEvent | undefined} [event] 点击事件
+   * @param {string} [shortKey] 快捷键参数
    * @returns {void}
    */
   fire(event, shortKey = '') {
     event?.stopPropagation();
     if (typeof this.onClick === 'function') {
       const selections = this.editor.getSelections();
-      console.log('selections', selections);
       // 判断是不是多选
       this.isSelections = selections.length > 1;
       // 当onClick返回null、undefined、false时，维持原样
       const results = selections.map(
         (selection, index, srcArray) => this.onClick(selection, shortKey, event) || srcArray[index],
       );
-      console.log('menubase - fire -- 1', results, !this.bubbleMenu && this.updateMarkdown);
       if (!this.bubbleMenu && this.updateMarkdown) {
         const hasPromise = results.some((result) => result instanceof Promise);
         if (hasPromise) {
-          // 非下拉菜单按钮保留selection
+          // 处理异步结果（如上传文件等）
           Promise.all(results.map((result) => (result instanceof Promise ? result : Promise.resolve(result)))).then(
             (resolvedResults) => {
               const safeResults = resolvedResults.map((result, index) =>
                 result === undefined || result === null ? selections[index] : String(result),
               );
-              this.editor.replaceSelections(safeResults);
+              this.$replaceSelectionsWithCursor(safeResults);
               this.editor.editor.focus();
               this.$afterClick();
             },
           );
         } else {
-          this.editor.replaceSelections(results);
+          // 处理同步结果
+          this.$replaceSelectionsWithCursor(results);
           this.editor.editor.focus();
           this.$afterClick();
         }
       }
     }
+  }
+
+  /**
+   * 替换选区并智能调整光标位置（CodeMirror 6版本）
+   * @param {string[]} replacements 替换文本数组
+   */
+  $replaceSelectionsWithCursor(replacements) {
+    const view = this.editor.editor;
+    const { state } = view;
+    const { selection } = state;
+    const changes = [];
+    let offset = 0;
+    // 为每个选区创建替换变更
+    selection.ranges.forEach((range, index) => {
+      const replacement = String(replacements[index] || '');
+      const { from, to } = range;
+      changes.push({
+        from: from + offset,
+        to: to + offset,
+        insert: replacement,
+      });
+      // 累计偏移量，用于后续选区位置计算
+      const oldLength = to - from;
+      const newLength = replacement.length;
+      offset += newLength - oldLength;
+    });
+    // 应用更改
+    view.dispatch({
+      changes,
+    });
   }
 
   /**
@@ -343,6 +373,7 @@ export default class MenuBase {
     const { state } = view;
     const { selection, doc } = state;
     const { main: selectionMain } = selection;
+    console.log('selectionMain', { state, doc, selection, selectionMain });
 
     // 辅助函数：将偏移量转换为行列位置
     const offsetToPos = (offset) => {
@@ -389,53 +420,24 @@ export default class MenuBase {
    */
   setLessSelection(lessBefore, lessAfter) {
     const cm = this.editor.editor;
-    const { state } = cm;
-    const { selection, doc } = state;
-    const { main: selectionMain } = selection;
-
-    // 获取当前选择的起始和结束位置
-    const { from, to } = selectionMain;
-
+    const { begin, end } = this.$getSelectionRange();
+    console.log('setLessSelection', { lessBefore, lessAfter, begin, end });
     // 计算 lessBefore 的偏移量
     const lessBeforeLines = lessBefore.match(/\n/g)?.length || 0;
-    let newFrom = from;
-
-    if (lessBeforeLines > 0) {
-      // 如果 lessBefore 包含换行符，需要跳过相应的行数
-      const fromLine = doc.lineAt(from);
-      const targetLineNumber = fromLine.number + lessBeforeLines;
-      if (targetLineNumber <= doc.lines) {
-        const targetLine = doc.line(targetLineNumber);
-        const lastLineContent = lessBefore.replace(/^[\s\S]*?\n([^\n]*)$/, '$1');
-        newFrom = targetLine.from + lastLineContent.length;
-      }
-    } else {
-      // 如果没有换行符，直接添加长度
-      newFrom = from + lessBefore.length;
-    }
+    const newBeginLine = lessBeforeLines > 0 ? begin.line + lessBeforeLines : begin.line;
+    const newBeginCh =
+      lessBeforeLines > 0 ? lessBefore.replace(/^[\s\S]*?\n([^\n]*)$/, '$1').length : begin.ch + lessBefore.length;
 
     // 计算 lessAfter 的偏移量
     const lessAfterLines = lessAfter.match(/\n/g)?.length || 0;
-    let newTo = to;
+    const newEndLine = lessAfterLines > 0 ? end.line - lessAfterLines : end.line;
+    const newEndCh =
+      lessAfterLines > 0 ? end.ch - lessAfter.replace(/^[\s\S]*?\n([^\n]*)$/, '$1').length : end.ch - lessAfter.length;
 
-    if (lessAfterLines > 0) {
-      // 如果 lessAfter 包含换行符，需要向前跳过相应的行数
-      const toLine = doc.lineAt(to);
-      const targetLineNumber = toLine.number - lessAfterLines;
-      if (targetLineNumber >= 1) {
-        const targetLine = doc.line(targetLineNumber);
-        newTo = targetLine.to;
-      }
-    } else {
-      // 如果没有换行符，直接减去长度
-      newTo = to - lessAfter.length;
-    }
+    // 使用 CodeMirror 6 的方式设置选择
+    const newFrom = cm.state.doc.line(newBeginLine + 1).from + newBeginCh;
+    const newTo = cm.state.doc.line(newEndLine + 1).from + newEndCh;
 
-    // 确保位置在有效范围内
-    newFrom = Math.max(0, Math.min(newFrom, doc.length));
-    newTo = Math.max(newFrom, Math.min(newTo, doc.length));
-
-    // 设置新的选择范围
     cm.dispatch({
       selection: { anchor: newFrom, head: newTo },
     });
