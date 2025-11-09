@@ -181,7 +181,10 @@ export default class Bubble extends Toolbar {
       console.log('event = 当编辑区选中内容改变时，需要展示/隐藏bubble工具栏，并计算工具栏位置');
       const { from, to } = selection;
       setTimeout(() => {
-        const editorState = this.options.editor.editor.state;
+        const editorAdapter = this.options.editor.editor;
+        // 兼容 CM6Adapter,获取真正的 EditorView
+        const view = editorAdapter.view || editorAdapter;
+        const editorState = view.state;
         const selections = editorState.selection.ranges.map((range) =>
           editorState.doc.sliceString(range.from, range.to),
         );
@@ -209,7 +212,9 @@ export default class Bubble extends Toolbar {
           return;
         }
         try {
-          const editorView = this.options.editor.editor;
+          const editorAdapter = this.options.editor.editor;
+          // 兼容 CM6Adapter,获取真正的 EditorView
+          const editorView = editorAdapter.view || editorAdapter;
 
           const fromCoords = editorView.coordsAtPos(from);
           const toCoords = editorView.coordsAtPos(to);

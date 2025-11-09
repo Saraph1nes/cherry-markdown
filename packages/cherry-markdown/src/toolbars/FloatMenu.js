@@ -60,8 +60,8 @@ export default class FloatMenu extends Toolbar {
     });
 
     // 监听beforeSelectionChange事件（这个事件在Editor.js中已经触发）
-    this.$cherry.$event.on('beforeSelectionChange', ({ selection }) => {
-      this.handleBeforeSelectionChange(selection);
+    this.$cherry.$event.on('beforeSelectionChange', (event) => {
+      this.handleBeforeSelectionChange(event);
     });
   }
 
@@ -71,8 +71,10 @@ export default class FloatMenu extends Toolbar {
    */
   handleSelectionChange(event) {
     if (this.editor && this.editor.editor) {
-      const selection = this.editor.editor.state.selection.main;
-      const line = this.editor.editor.state.doc.lineAt(selection.head);
+      const editorAdapter = this.editor.editor;
+      const view = editorAdapter.view || editorAdapter;
+      const selection = view.state.selection.main;
+      const line = view.state.doc.lineAt(selection.head);
       const pos = { line: line.number - 1 };
 
       // 创建兼容的 CodeMirror 对象
@@ -111,8 +113,10 @@ export default class FloatMenu extends Toolbar {
       return null;
     }
 
-    const editorView = this.editor.editor;
-    const state = editorView.state;
+    const editorAdapter = this.editor.editor;
+    // 兼容 CM6Adapter,获取真正的 EditorView
+    const view = editorAdapter.view || editorAdapter;
+    const state = view.state;
     const selection = state.selection.main;
     const line = state.doc.lineAt(selection.head);
 
@@ -139,8 +143,8 @@ export default class FloatMenu extends Toolbar {
               // 尝试使用 coordsAtPos 获取更精确的行高
               let lineHeight = 20; // 默认行高
               try {
-                const startCoords = editorView.coordsAtPos(docLine.from);
-                const endCoords = editorView.coordsAtPos(docLine.to);
+                const startCoords = view.coordsAtPos(docLine.from);
+                const endCoords = view.coordsAtPos(docLine.to);
                 if (startCoords && endCoords) {
                   lineHeight = Math.max(startCoords.bottom - startCoords.top, 20);
                 }
@@ -158,7 +162,7 @@ export default class FloatMenu extends Toolbar {
       // 添加对 coordsAtPos 的支持
       coordsAtPos: (pos) => {
         try {
-          return editorView.coordsAtPos(pos);
+          return view.coordsAtPos(pos);
         } catch (e) {
           return null;
         }
@@ -232,10 +236,13 @@ export default class FloatMenu extends Toolbar {
       return;
     }
     try {
-      const editorView = this.editor.editor;
-      if (!editorView) {
+      const editorAdapter = this.editor.editor;
+      if (!editorAdapter) {
         return;
       }
+
+      // 兼容 CM6Adapter,获取真正的 EditorView
+      const editorView = editorAdapter.view || editorAdapter;
 
       // 获取当前行的起始位置
       const lineStart = editorView.state.doc.line(pos.line + 1).from;
@@ -248,9 +255,13 @@ export default class FloatMenu extends Toolbar {
 
       // 获取编辑器容器位置
       const editorPosition = this.editorDom.getBoundingClientRect();
+      // 获取滚动容器的位置和滚动距离
+      const scrollDOM = editorView.scrollDOM;
+      const scrollTop = scrollDOM.scrollTop;
 
-      // 计算相对于编辑器的位置
-      const top = coords.top - editorPosition.top;
+      // 计算相对于编辑器的位置，需要加上滚动距离
+      // coords.top 是视口坐标，减去编辑器顶部得到相对位置，再加上滚动距离得到在内容中的绝对位置
+      const top = coords.top - editorPosition.top + scrollTop;
       let left = coords.left - editorPosition.left;
 
       // 获取编辑器样式
@@ -356,10 +367,13 @@ export default class FloatMenu extends Toolbar {
    */
   getLineHeight(line, codeMirror) {
     // CodeMirror 6 中需要重新实现行高计算
-    const editorView = this.editor.editor;
-    if (!editorView) {
+    const editorAdapter = this.editor.editor;
+    if (!editorAdapter) {
       return line * 20; // 默认行高
     }
+
+    // 兼容 CM6Adapter,获取真正的 EditorView
+    const editorView = editorAdapter.view || editorAdapter;
 
     try {
       // 获取指定行的起始位置

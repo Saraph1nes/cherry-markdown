@@ -15,7 +15,7 @@
  */
 // @ts-check
 import { EditorView, keymap, placeholder, lineNumbers, Decoration, WidgetType } from '@codemirror/view';
-import { EditorState, StateEffect, StateField } from '@codemirror/state';
+import { EditorState, StateEffect, StateField, EditorSelection } from '@codemirror/state';
 import { markdown } from '@codemirror/lang-markdown';
 import { search, SearchQuery } from '@codemirror/search';
 import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands';
@@ -28,6 +28,7 @@ import { handleFileUploadCallback } from '@/utils/file';
 import { tags } from '@lezer/highlight';
 import { createElement } from './utils/dom';
 import { longTextReg, base64Reg, imgDrawioXmlReg, createUrlReg } from './utils/regexp';
+import { addEvent } from './utils/event';
 import { handleNewlineIndentList } from './utils/autoindent';
 
 /**
@@ -258,7 +259,12 @@ class CM6Adapter {
 
   // 获取选项
   getOption(option) {
-    // 简化实现
+    // CodeMirror 6 中需要提供兼容的选项值
+    if (option === 'extraKeys') {
+      // 返回空对象而不是 null,避免代码尝试访问属性时出错
+      return {};
+    }
+    // 其他选项返回 null
     return null;
   }
 
@@ -294,14 +300,50 @@ class CM6Adapter {
 
   // 查找标记
   findMarks(from, to) {
-    // 简化实现,返回空数组
-    return [];
+    const fromPos = this.lineAndChToPos(from.line, from.ch);
+    const toPos = this.lineAndChToPos(to.line, to.ch);
+    
+    // 从 markField 中获取当前的装饰
+    const marks = this.view.state.field(markField, false);
+    if (!marks) return [];
+    
+    const result = [];
+    const iter = marks.iter();
+    while (iter.value) {
+      // 检查装饰是否与指定范围重叠
+      if (iter.from <= toPos && iter.to >= fromPos) {
+        result.push({
+          from: this.posToLineAndCh(iter.from),
+          to: this.posToLineAndCh(iter.to),
+          className: iter.value.spec?.class || '',
+        });
+      }
+      iter.next();
+    }
+    return result;
   }
 
   // 获取所有标记
   getAllMarks() {
-    // 简化实现
-    return [];
+    const marks = this.view.state.field(markField, false);
+    if (!marks) return [];
+    
+    const result = [];
+    const iter = marks.iter();
+    while (iter.value) {
+      result.push({
+        from: this.posToLineAndCh(iter.from),
+        to: this.posToLineAndCh(iter.to),
+        className: iter.value.spec?.class || '',
+        clear: () => {
+          this.view.dispatch({
+            effects: removeMark.of({ from: iter.from, to: iter.to }),
+          });
+        },
+      });
+      iter.next();
+    }
+    return result;
   }
 
   // 查找单词
@@ -371,7 +413,45 @@ class CM6Adapter {
   _emit(event, ...args) {
     const handlers = this._eventHandlers.get(event);
     if (handlers) {
-      handlers.forEach((handler) => handler(this, ...args));
+      // 特殊处理 change 事件,转换为 CM5 兼容格式
+      if (event === 'change' && args[0]?.changes) {
+        const update = args[0];
+        // 将 CM6 的 update 对象转换为 CM5 的 change 对象
+        update.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
+          // 使用 startState 来转换位置,避免访问可能已失效的当前状态
+          const fromLine = update.startState.doc.lineAt(fromA);
+          const toLine = update.startState.doc.lineAt(toA);
+          const from = { line: fromLine.number - 1, ch: fromA - fromLine.from };
+          const to = { line: toLine.number - 1, ch: toA - toLine.from };
+          const text = inserted.toString().split('\n');
+
+          // 获取事件来源
+          let origin;
+          if (update.transactions.length > 0) {
+            const tr = update.transactions[0];
+            if (tr.annotation && tr.annotation.userEvent) {
+              const userEvent = tr.annotation.userEvent;
+              if (userEvent.includes('input')) origin = '+input';
+              else if (userEvent.includes('delete')) origin = '+delete';
+              else if (userEvent.includes('undo')) origin = 'undo';
+              else if (userEvent.includes('redo')) origin = 'redo';
+            }
+          }
+
+          // CM5 兼容的 change 对象
+          const changeObj = {
+            from,
+            to,
+            text,
+            removed: update.startState.doc.sliceString(fromA, toA).split('\n'),
+            origin,
+          };
+
+          handlers.forEach((handler) => handler(this, changeObj));
+        });
+      } else {
+        handlers.forEach((handler) => handler(this, ...args));
+      }
     }
   }
 
@@ -560,9 +640,34 @@ export default class Editor {
    * @param {*} className 利用codemirror的MarkText生成的新元素的class
    */
   formatBigData2Mark = (reg, className) => {
-    // CodeMirror 6 中需要使用 SearchCursor 和 Decoration 来实现
-    // 这里需要重新实现标记功能
-    console.warn('formatBigData2Mark needs to be reimplemented for CodeMirror 6');
+    const editor = this.editor;
+    const searcher = editor.getSearchCursor(reg);
+    
+    let oneSearch = searcher.findNext();
+    for (; oneSearch !== false; oneSearch = searcher.findNext()) {
+      const target = searcher.from();
+      if (!target) {
+        continue;
+      }
+      const bigString = oneSearch[2] ?? '';
+      const targetChFrom = target.ch + (oneSearch[1]?.length || 0);
+      const targetChTo = targetChFrom + bigString.length;
+      const targetLine = target.line;
+      const begin = { line: targetLine, ch: targetChFrom };
+      const end = { line: targetLine, ch: targetChTo };
+      
+      // 检查是否已经标记过
+      if (editor.findMarks(begin, end).length > 0) {
+        continue;
+      }
+      
+      // 创建替换元素
+      const newSpan = createElement('span', `cm-string ${className}`, { title: bigString });
+      newSpan.textContent = bigString;
+      
+      // 标记文本
+      editor.markText(begin, end, { replacedWith: newSpan, atomic: true });
+    }
   };
 
   /**
@@ -573,9 +678,33 @@ export default class Editor {
     if (!this.options.showFullWidthMark) {
       return;
     }
-    // CodeMirror 6 中需要使用 Decoration 来实现标记功能
-    // 这里需要重新实现全角符号标记
-    console.warn('formatFullWidthMark needs to be reimplemented for CodeMirror 6');
+    
+    const regex = /[·￥、：""【】（）《》]/;
+    const editor = this.editor;
+    const searcher = editor.getSearchCursor(regex);
+    
+    let oneSearch = searcher.findNext();
+    for (; oneSearch !== false; oneSearch = searcher.findNext()) {
+      const target = searcher.from();
+      if (!target) {
+        continue;
+      }
+      
+      const from = { line: target.line, ch: target.ch };
+      const to = { line: target.line, ch: target.ch + 1 };
+      
+      // 检查是否已经标记过
+      const existMarks = editor.findMarks(from, to).filter((item) => {
+        return item.className === 'cm-fullWidth';
+      });
+      
+      if (existMarks.length === 0) {
+        this.markText(from, to, {
+          className: 'cm-fullWidth',
+          title: '按住Ctrl/Cmd点击切换成半角（Hold down Ctrl/Cmd and click to switch to half-width）',
+        });
+      }
+    }
   }
 
   /**
@@ -819,15 +948,24 @@ export default class Editor {
   onMouseDown = (editorView, evt) => {
     // 鼠标按下时，清除所有子菜单（如Bubble工具栏等），
     this.$cherry.$event.emit('cleanAllSubMenus'); // Bubble中处理需要考虑太多，直接在编辑器中处理可包括Bubble中所有情况，因为产生Bubble的前提是光标在编辑器中 add by ufec
-    const clickPos = editorView.posAtCoords({ x: evt.clientX, y: evt.clientY });
+    
+    // 适配 CM6Adapter
+    const view = editorView.view || editorView;
+    
+    // 验证坐标值是否有效
+    if (!Number.isFinite(evt.clientX) || !Number.isFinite(evt.clientY)) {
+      return;
+    }
+    
+    const clickPos = view.posAtCoords({ x: evt.clientX, y: evt.clientY });
     if (clickPos === null) {
       return;
     }
-    const line = editorView.state.doc.lineAt(clickPos);
+    const line = view.state.doc.lineAt(clickPos);
     const targetLine = line.number - 1;
-    const top = Math.abs(evt.y - editorView.scrollDOM.getBoundingClientRect().y);
+    const top = Math.abs(evt.y - view.scrollDOM.getBoundingClientRect().y);
     this.previewer.scrollToLineNumWithOffset(targetLine + 1, top);
-    this.toHalfWidth(editorView, evt);
+    this.toHalfWidth(view, evt);
   };
 
   /**
@@ -896,6 +1034,12 @@ export default class Editor {
           adapter._emit('beforeChange', adapter);
         }
         if (update.selectionSet) {
+          // 触发 beforeSelectionChange 事件,供 FloatMenu 和 Bubble 使用
+          const selection = update.state.selection.main;
+          this.$cherry.$event.emit('beforeSelectionChange', {
+            selection: { from: selection.from, to: selection.to },
+            isUserInteraction: update.transactions.some((tr) => tr.isUserEvent('select')),
+          });
           adapter._emit('cursorActivity');
         }
       }),
@@ -978,42 +1122,21 @@ export default class Editor {
     //   },
     // });
     this.previewer = previewer;
+    this.editor = editor;
 
-    const highlightStyle = HighlightStyle.define([
-      { tag: tags.heading1, class: 'cm-header header-h1' },
-      { tag: tags.heading2, class: 'cm-header header-h2' },
-      { tag: tags.heading3, class: 'cm-header header-h3' },
-      { tag: tags.heading4, class: 'cm-header header-h4' },
-      { tag: tags.heading5, class: 'cm-header header-h5' },
-      { tag: tags.heading6, class: 'cm-header header-h6' },
-      { tag: tags.url, class: 'cm-url' },
-      { tag: tags.link, class: 'cm-link' },
-      { tag: tags.quote, class: 'cm-quote' },
-      { tag: tags.string, class: 'cm-string' },
-      { tag: tags.emphasis, class: 'cm-em' },
-      { tag: tags.strong, class: 'cm-strong' },
-      { tag: tags.strikethrough, class: 'cm-strikethrough' },
-      { tag: tags.comment, class: 'cm-comment' },
-      { tag: tags.content, class: 'cm-variable-2' },
-      { tag: tags.typeName, class: 'cm-type' },
-    ]);
-
-    if (this.options.value) {
-      editor.setOption('value', this.options.value);
-    }
-
-    editor.on('blur', (codemirror, evt) => {
-      this.options.onBlur(evt, codemirror);
+    // 绑定事件监听器
+    editor.on('blur', (evt) => {
+      this.options.onBlur(evt, editor);
       this.$cherry.$event.emit('blur', { evt, cherry: this.$cherry });
     });
 
-    editor.on('focus', (codemirror, evt) => {
-      this.options.onFocus(evt, codemirror);
+    editor.on('focus', (evt) => {
+      this.options.onFocus(evt, editor);
       this.$cherry.$event.emit('focus', { evt, cherry: this.$cherry });
     });
 
-    editor.on('change', (codemirror, evt) => {
-      this.options.onChange(evt, codemirror);
+    editor.on('change', () => {
+      this.options.onChange(null, editor);
       this.dealSpecialWords();
       if (this.options.autoSave2Textarea) {
         // 将内容同步到 textarea
@@ -1021,45 +1144,25 @@ export default class Editor {
       }
     });
 
-          // 检查具体的用户事件类型
-          const userEvents = update.transactions.map((tr) => tr.annotation(Transaction.userEvent)).filter(Boolean);
-
-          // 处理选择变化
-          const selection = update.state.selection.main;
-          this.$cherry.$event.emit('beforeSelectionChange', { selection, isUserInteraction, userEvents });
-        }
-      }),
-
-      EditorView.domEventHandlers({
-        paste: (event, view) => {
-          this.onPaste(event, view);
-        },
-        scroll: (event, view) => {
-          this.$cherry.$event.emit('onScroll');
-          this.onScroll(view);
-        },
-        mousedown: (event, view) => {
-          this.onMouseDown(view, event);
-        },
-        drop: (event, view) => {
-          // handle drop
-          console.log('drop event', event);
-        },
-        keyup: (event, view) => {
-          this.onKeyup(event, view);
-        },
-      }),
-    ];
-
-    const state = EditorState.create({
-      doc: this.options.value || '',
-      extensions,
+    editor.on('scroll', () => {
+      this.$cherry.$event.emit('onScroll');
+      this.onScroll(view);
     });
-    const parent = this.options.editorDom;
 
-    this.editor = new EditorView({
-      state,
-      parent,
+    editor.on('paste', (event) => {
+      this.onPaste(event, view);
+    });
+
+    editor.on('mousedown', (event) => {
+      this.onMouseDown(view, event);
+    });
+
+    editor.on('keyup', (event) => {
+      this.onKeyup(event, view);
+    });
+
+    editor.on('cursorActivity', () => {
+      this.onCursorActivity();
     });
 
     addEvent(
@@ -1343,8 +1446,10 @@ export default class Editor {
    */
   getSelections() {
     if (!this.editor) return [];
-    const selections = this.editor.state.selection.ranges.map((range) =>
-      this.editor.state.doc.sliceString(range.from, range.to),
+    // 兼容 CM6Adapter,获取真正的 EditorView
+    const view = this.editor.view || this.editor;
+    const selections = view.state.selection.ranges.map((range) =>
+      view.state.doc.sliceString(range.from, range.to),
     );
     return selections;
   }
@@ -1355,8 +1460,10 @@ export default class Editor {
    */
   getSelection() {
     if (!this.editor) return '';
-    const selection = this.editor.state.selection.main;
-    return this.editor.state.doc.sliceString(selection.from, selection.to);
+    // 兼容 CM6Adapter,获取真正的 EditorView
+    const view = this.editor.view || this.editor;
+    const selection = view.state.selection.main;
+    return view.state.doc.sliceString(selection.from, selection.to);
   }
 
   /**

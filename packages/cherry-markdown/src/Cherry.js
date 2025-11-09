@@ -987,11 +987,13 @@ export default class Cherry extends CherryStatic {
 
   /**
    * @private
-   * @param {EditorView} editorView
+   * @param {EditorView | Object} editorView
    */
   initText(editorView) {
     try {
-      const markdownText = editorView.state.doc.toString();
+      // 兼容 CM6Adapter,如果传入的是 adapter,则获取其内部的 view
+      const view = editorView.view || editorView;
+      const markdownText = view.state.doc.toString();
       this.lastMarkdownText = markdownText;
       const html = this.engine.makeHtml(markdownText);
       if (this.options.editor.defaultModel === 'editOnly') {
@@ -1011,21 +1013,24 @@ export default class Cherry extends CherryStatic {
    * @param {EditorView} editorView
    */
   /**
-   * 编辑器内容变更时触发，更新预览区内容
+   * 编辑器内容变更时触发,更新预览区内容
    * @private
-   * @param {Event} _evt - 编辑事件对象（未使用）
-   * @param {EditorView} editorView - 编辑器实例
+   * @param {Event} _evt - 编辑事件对象(未使用)
+   * @param {EditorView | Object} editorView - 编辑器实例
    */
   editText(_evt, editorView) {
     try {
-      // 如果已有定时器，先清除，避免多次触发
+      // 兼容 CM6Adapter,如果传入的是 adapter,则获取其内部的 view
+      const view = editorView.view || editorView;
+
+      // 如果已有定时器,先清除,避免多次触发
       if (this.timer) {
         clearTimeout(this.timer);
         this.timer = null;
       }
       const interval = this.options.engine.global.flowSessionContext ? 10 : 50;
       this.timer = setTimeout(() => {
-        const markdownText = editorView.state.doc.toString();
+        const markdownText = view.state.doc.toString();
         if (markdownText !== this.lastMarkdownText) {
           this.lastMarkdownText = markdownText;
           const html = this.engine.makeHtml(markdownText);
@@ -1035,10 +1040,10 @@ export default class Cherry extends CherryStatic {
             html,
           });
         }
-        // 强制每次编辑（包括undo、redo）编辑器都会自动滚动到光标位置
+        // 强制每次编辑(包括undo、redo)编辑器都会自动滚动到光标位置
         if (!this.options.editor.keepDocumentScrollAfterInit) {
-          editorView.dispatch({
-            effects: EditorView.scrollIntoView(editorView.state.selection.main.from, {
+          view.dispatch({
+            effects: EditorView.scrollIntoView(view.state.selection.main.from, {
               y: 'nearest',
               x: 'nearest',
             }),

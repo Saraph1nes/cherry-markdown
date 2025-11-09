@@ -340,28 +340,43 @@ export default class MenuBase {
    * @param {string[]} replacements 替换文本数组
    */
   $replaceSelectionsWithCursor(replacements) {
-    const view = this.editor.editor;
+    const editorView = this.editor.editor;
+    const view = editorView.view || editorView;
     const { state } = view;
     const { selection } = state;
     const changes = [];
+    const newSelections = [];
     let offset = 0;
+    
     // 为每个选区创建替换变更
     selection.ranges.forEach((range, index) => {
       const replacement = String(replacements[index] || '');
       const { from, to } = range;
+      const adjustedFrom = from + offset;
+      const adjustedTo = to + offset;
+      
       changes.push({
-        from: from + offset,
-        to: to + offset,
+        from: adjustedFrom,
+        to: adjustedTo,
         insert: replacement,
       });
+      
+      // 计算新选区的位置（选中整个替换后的文本）
+      newSelections.push({
+        anchor: adjustedFrom,
+        head: adjustedFrom + replacement.length,
+      });
+      
       // 累计偏移量，用于后续选区位置计算
       const oldLength = to - from;
       const newLength = replacement.length;
       offset += newLength - oldLength;
     });
-    // 应用更改
+    
+    // 应用更改并设置选区
     view.dispatch({
       changes,
+      selection: { anchor: newSelections[0].anchor, head: newSelections[0].head },
     });
   }
 
@@ -369,7 +384,8 @@ export default class MenuBase {
    * 获取当前选择区域的range (完全兼容版本)
    */
   $getSelectionRange() {
-    const view = this.editor.editor;
+    const editorView = this.editor.editor;
+    const view = editorView.view || editorView;
     const { state } = view;
     const { selection, doc } = state;
     const { main: selectionMain } = selection;
@@ -419,7 +435,8 @@ export default class MenuBase {
    * @param {String} lessAfter
    */
   setLessSelection(lessBefore, lessAfter) {
-    const cm = this.editor.editor;
+    const editorView = this.editor.editor;
+    const cm = editorView.view || editorView;
     const { begin, end } = this.$getSelectionRange();
     console.log('setLessSelection', { lessBefore, lessAfter, begin, end });
     // 计算 lessBefore 的偏移量
@@ -450,7 +467,8 @@ export default class MenuBase {
    * @param {function} [cb] 回调函数，如果返回false，则恢复原来的选取
    */
   getMoreSelection(appendBefore = '', appendAfter = '', cb) {
-    const view = this.editor.editor;
+    const editorView = this.editor.editor;
+    const view = editorView.view || editorView;
     const { state } = view;
     const { selection, doc } = state;
     const { main: selectionMain } = selection;
@@ -514,7 +532,8 @@ export default class MenuBase {
    * @returns {string}
    */
   getSelection(selection, type = 'word', focus = false) {
-    const view = this.editor.editor;
+    const editorView = this.editor.editor;
+    const view = editorView.view || editorView;
     // 多光标模式下不做处理
     if (this.isSelections) {
       return selection;
