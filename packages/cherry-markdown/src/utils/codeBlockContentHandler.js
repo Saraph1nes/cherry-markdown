@@ -14,13 +14,12 @@
  * limitations under the License.
  */
 import { getCodeBlockRule } from '@/utils/regexp';
+import { EditorView, lineNumbers } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
-import { markdown } from '@codemirror/lang-markdown';
+import { keymap } from '@codemirror/view';
+import { defaultKeymap, indentWithTab } from '@codemirror/commands';
 import { getCodePreviewLangSelectElement } from '@/utils/code-preview-language-setting';
 import { copyToClip } from '@/utils/copy';
-// CodeMirror v6 中 sublime keymap 已集成到 @codemirror/commands 包中
-// 不再需要单独导入 sublime keymap
 
 export default class CodeBlockHandler {
   /**
@@ -283,48 +282,34 @@ export default class CodeBlockHandler {
     const dom = document.createElement('div');
     dom.className = 'cherry-previewer-codeBlock-content-handler__input';
     
-    // 创建 CodeMirror v6 编辑器
+    // 创建 CodeMirror 6 编辑器
+    const editor = this.codeMirror;
+    const extensions = [
+      lineNumbers(),
+      EditorView.lineWrapping,
+      keymap.of([...defaultKeymap, indentWithTab]),
+      EditorView.updateListener.of((update) => {
+        if (update.docChanged) {
+          editor.replaceSelection(update.state.doc.toString(), 'around');
+        }
+      }),
+    ];
+    
     const state = EditorState.create({
       doc: this.codeMirror.getSelection(),
-      extensions: [
-        EditorView.lineWrapping, // 自动换行
-        markdown(), // 代码高亮
-        EditorView.theme({
-          '&': {
-            fontSize: '14px',
-            fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
-          },
-          '.cm-content': {
-            padding: '8px',
-            minHeight: '100px',
-          },
-          '.cm-focused': {
-            outline: 'none',
-          },
-        }),
-        EditorView.updateListener.of((update) => {
-          if (update.docChanged) {
-            const editor = this.codeMirror;
-            const newValue = update.state.doc.toString();
-            editor.replaceSelection(newValue, 'around');
-          }
-        }),
-      ],
+      extensions,
     });
-
-    const editorInstance = new EditorView({
+    
+    const view = new EditorView({
       state,
       parent: dom,
     });
-
+    
     this.codeBlockEditor.editorDom.inputDiv = dom;
-    this.codeBlockEditor.editorDom.inputDom = editorInstance;
+    this.codeBlockEditor.editorDom.inputDom = view;
     this.$updateEditorPosition();
     this.container.appendChild(this.codeBlockEditor.editorDom.inputDiv);
-    this.codeBlockEditor.editorDom.inputDom.focus();
-    
-    // 去掉下面的逻辑，因为在代码块比较高时，强制让光标定位在最后会让页面出现跳跃的情况
-    // editorInstance.setCursor(Number.MAX_VALUE, Number.MAX_VALUE); // 指针设置至CodeBlock末尾
+    view.focus();
   }
 
   /**
@@ -382,7 +367,7 @@ export default class CodeBlockHandler {
   }
 
   /**
-   * 更新编辑器的位置（尺寸和位置）
+   * 更新编辑器的位置(尺寸和位置)
    */
   $updateEditorPosition() {
     this.$setInputOffset();

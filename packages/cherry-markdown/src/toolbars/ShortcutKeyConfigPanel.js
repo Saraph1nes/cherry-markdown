@@ -1,5 +1,3 @@
-// CodeMirror v6 中不再提供 mac 函数，需要自己实现
-const mac = typeof navigator != "undefined" ? /Mac/.test(navigator.platform) : false;
 import {
   getAllowedShortcutKey,
   keyStackIsModifierkeys,
@@ -11,6 +9,7 @@ import {
   setDisableShortcutKey,
   storageKeyMap,
   clearStorageKeyMap,
+  mac,
 } from '@/utils/shortcutKey';
 import { createElement } from '@/utils/dom';
 

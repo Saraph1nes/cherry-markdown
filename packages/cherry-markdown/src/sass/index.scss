@@ -1,6 +1,5 @@
 @use 'sass:meta';
 
-// CodeMirror v6 styles are loaded via JavaScript, not CSS files
-// @include meta.load-css('codemirror/dist/index.css');
+// CodeMirror 6 不需要单独引入样式文件,样式已集成在 @codemirror/view 中
 
 @import './cherry.scss';

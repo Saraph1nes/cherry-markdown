@@ -22,8 +22,6 @@
 import escapeRegExp from 'lodash/escapeRegExp';
 import SyntaxBase from '@/core/SyntaxBase';
 import { allSuggestList, suggesterKeywords } from '@/core/hooks/SuggestList';
-// CodeMirror v6 中不再提供 Pass 类，使用 undefined 替代
-const Pass = { toString: () => undefined };
 import { isLookbehindSupported } from '@/utils/regexp';
 import { replaceLookbehind } from '@/utils/lookbehind-replace';
 import { isBrowser } from '@/utils/env';
@@ -321,7 +319,7 @@ class SuggesterPanel {
         extraKeys[key] = () => {
           if (this.cursorMove) {
             // logic to decide whether to move up or not
-            return Pass.toString();
+            return false;
           }
         };
       } else if (typeof extraKeys[key] === 'string') {

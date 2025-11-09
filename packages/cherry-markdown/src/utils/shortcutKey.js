@@ -1,5 +1,6 @@
-// CodeMirror v6 中不再提供 mac 函数，需要自己实现
-const mac = typeof navigator != "undefined" ? /Mac/.test(navigator.platform) : false;
+// 检测是否是 Mac 平台
+export const mac = typeof navigator !== 'undefined' ? /Mac/.test(navigator.platform) : false;
+
 export const SHIFT_KEY = 'Shift';
 export const ALT_KEY = 'Alt';
 export const CONTROL_KEY = 'Control';
