@@ -75,8 +75,8 @@ export default class ListHandler {
     this.target.removeAttribute('contenteditable');
     this.target.removeEventListener('input', this.handleEditablesInputBinded, false);
     this.target.removeEventListener('focusout', this.handleEditablesUnfocusBinded, false);
-    const cursor = this.editor.editor.state.selection.main.head; // 获取光标位置
-    this.editor.editor.dispatch({
+    const cursor = this.editor.editor.view.state.selection.main.head; // 获取光标位置
+    this.editor.editor.view.dispatch({
       selection: { anchor: cursor, head: cursor },
     }); // 取消选中
   }
@@ -87,7 +87,7 @@ export default class ListHandler {
     if (targetLiIdx === -1) {
       return; // 没有找到li
     }
-    const { doc } = this.editor.editor.state;
+    const { doc } = this.editor.editor.view.state;
     const contents = getValueWithoutCode(doc.toString())?.split('\n') ?? [];
     let contentsLiCount = 0; // 编辑器中是列表的数量
     let targetLine = -1; // 行
@@ -134,11 +134,11 @@ export default class ListHandler {
     const toLineEnd = targetLine + targetContent.length;
     const toPos = doc.line(toLineEnd).from + targetCh + (targetContent[targetContent.length - 1]?.length || 0);
 
-    this.editor.editor.dispatch({
+    this.editor.editor.view.dispatch({
       selection: { anchor: fromPos, head: toPos },
     });
     this.range = [fromPos, toPos];
-    this.position = this.editor.editor.state.selection.main.head; // 输入就获取光标位置，防止后面点到编辑器dom的时候光标位置不对
+    this.position = this.editor.editor.view.state.selection.main.head; // 输入就获取光标位置，防止后面点到编辑器dom的时候光标位置不对
   }
 
   /**
@@ -173,7 +173,7 @@ export default class ListHandler {
             : event.target.innerHTML.replace(/<span class="ch-icon ch-icon-(square|check)"><\/span>/, '');
           const md = this.editor.$cherry.engine.makeMarkdown(replaceHtml);
           const [from, to] = this.range;
-          this.editor.editor.dispatch({
+          this.editor.editor.view.dispatch({
             changes: { from, to, insert: md },
           });
         }
@@ -196,11 +196,11 @@ export default class ListHandler {
       // @ts-ignore
       splitInnerText = event.target.innerText.split('\n');
     }
-    // 只有第一段是换行，后面的换行都应该认为是另一行
+    // 只有第一段是换行,后面的换行都应该认为是另一行
     const [before, ...after] = splitInnerText;
     // 获取当前光标位置
-    const cursor = this.editor.editor.state.selection.main.head;
-    const doc = this.editor.editor.state.doc;
+    const cursor = this.editor.editor.view.state.selection.main.head;
+    const doc = this.editor.editor.view.state.doc;
     const cursorLine = doc.lineAt(cursor);
     const lineContent = cursorLine.text;
     const regRes = this.regList.exec(lineContent);
@@ -217,7 +217,7 @@ export default class ListHandler {
     const replaceTo = lineStart + lineContent.length;
 
     // 执行替换操作
-    this.editor.editor.dispatch({
+    this.editor.editor.view.dispatch({
       changes: [
         { from: replaceFrom, to: replaceTo, insert: before },
         { from: replaceTo, insert: insertContent },
@@ -229,7 +229,7 @@ export default class ListHandler {
     });
 
     // 将光标聚焦到编辑器上
-    this.editor.editor.focus();
+    this.editor.editor.view.focus();
     this.remove();
   }
 }

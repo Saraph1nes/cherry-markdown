@@ -17,7 +17,7 @@
 import { EditorView, keymap, placeholder, lineNumbers, Decoration, WidgetType } from '@codemirror/view';
 import { EditorState, StateEffect, StateField, EditorSelection } from '@codemirror/state';
 import { markdown } from '@codemirror/lang-markdown';
-import { search, SearchQuery } from '@codemirror/search';
+import { search, SearchQuery, setSearchQuery } from '@codemirror/search';
 import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
@@ -36,6 +36,28 @@ import { handleNewlineIndentList } from './utils/autoindent';
  * @typedef {import('~types/editor').EditorEventCallback} EditorEventCallback
  * @typedef {import('codemirror')} CodeMirror
  */
+
+// 创建搜索高亮效果 - 用于添加 cm-searching 类
+const setSearchHighlightEffect = StateEffect.define();
+
+// 搜索高亮的 StateField
+const searchHighlightField = StateField.define({
+  create() {
+    return Decoration.none;
+  },
+  update(decorations, tr) {
+    decorations = decorations.map(tr.changes);
+    
+    for (let effect of tr.effects) {
+      if (effect.is(setSearchHighlightEffect)) {
+        decorations = effect.value;
+      }
+    }
+    
+    return decorations;
+  },
+  provide: f => EditorView.decorations.from(f),
+});
 
 /**
  * CodeMirror 6 适配器 - 提供与 CodeMirror 5 兼容的 API
@@ -259,13 +281,81 @@ class CM6Adapter {
 
   // 获取选项
   getOption(option) {
-    // CodeMirror 6 中需要提供兼容的选项值
-    if (option === 'extraKeys') {
-      // 返回空对象而不是 null,避免代码尝试访问属性时出错
-      return {};
+    // CodeMirror 6 中获取选项的方式不同
+    switch (option) {
+      case 'readOnly':
+        return this.view.state.readOnly || false;
+      case 'disableInput':
+        return this.view.state.readOnly || false;
+      case 'value':
+        return this.getValue();
+      case 'extraKeys':
+        // 返回空对象而不是 null,避免代码尝试访问属性时出错
+        return {};
+      default:
+        console.warn(`Option ${option} not supported in CM6 adapter`);
+        return null;
     }
-    // 其他选项返回 null
-    return null;
+  }
+
+  // 设置搜索查询（用于高亮搜索结果）
+  setSearchQuery(query, caseSensitive = false, isRegex = false) {
+    // 如果查询为空，清除搜索
+    if (!query || query.trim() === '') {
+      this.clearSearchQuery();
+      return;
+    }
+    
+    const doc = this.view.state.doc;
+    const decorations = [];
+    
+    // 创建搜索正则表达式
+    let searchRe;
+    if (isRegex) {
+      try {
+        searchRe = new RegExp(query, caseSensitive ? 'g' : 'gi');
+      } catch (e) {
+        console.warn('Invalid regex:', e);
+        return;
+      }
+    } else {
+      const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      searchRe = new RegExp(escaped, caseSensitive ? 'g' : 'gi');
+    }
+    
+    // 查找所有匹配并创建装饰
+    const text = doc.toString();
+    let match;
+    searchRe.lastIndex = 0;
+    
+    while ((match = searchRe.exec(text)) !== null) {
+      const from = match.index;
+      const to = from + match[0].length;
+      
+      decorations.push(
+        Decoration.mark({
+          class: 'cm-searching',
+        }).range(from, to)
+      );
+      
+      // 防止无限循环（当匹配空字符串时）
+      if (match[0].length === 0) {
+        searchRe.lastIndex++;
+      }
+    }
+    
+    // 应用装饰
+    this.view.dispatch({
+      effects: setSearchHighlightEffect.of(Decoration.set(decorations)),
+    });
+  }
+
+  // 清除搜索高亮
+  clearSearchQuery() {
+    // 清除所有搜索高亮装饰
+    this.view.dispatch({
+      effects: setSearchHighlightEffect.of(Decoration.none),
+    });
   }
 
   // 标记文本
@@ -368,14 +458,30 @@ class CM6Adapter {
   }
 
   // 获取搜索游标
-  getSearchCursor(query, pos) {
+  getSearchCursor(query, pos, caseFold) {
     const searchQuery = new SearchQuery({
       search: typeof query === 'string' ? query : query.source,
       regexp: query instanceof RegExp,
+      caseSensitive: caseFold === false, // caseFold 为 false 时表示大小写敏感
     });
 
     let currentPos = pos ? this.lineAndChToPos(pos.line, pos.ch) : 0;
     const doc = this.view.state.doc;
+
+    // 用于向前搜索的辅助函数
+    const findPreviousMatch = (fromPos) => {
+      // 从文档开始到指定位置查找所有匹配
+      const cursor = searchQuery.getCursor(doc, 0);
+      let lastMatch = null;
+      
+      let result = cursor.next();
+      while (!result.done && result.value.from < fromPos) {
+        lastMatch = result.value;
+        result = cursor.next();
+      }
+      
+      return lastMatch;
+    };
 
     return {
       findNext: () => {
@@ -390,6 +496,18 @@ class CM6Adapter {
         const match = query instanceof RegExp ? matched.match(query) : [matched];
         return match || false;
       },
+      findPrevious: () => {
+        const match = findPreviousMatch(currentPos);
+        if (!match) return false;
+
+        currentPos = match.from;
+        this._lastSearchResult = match;
+
+        // 返回匹配的文本数组(兼容 CM5)
+        const matched = doc.sliceString(match.from, match.to);
+        const matchResult = query instanceof RegExp ? matched.match(query) : [matched];
+        return matchResult || false;
+      },
       from: () => {
         if (!this._lastSearchResult) return null;
         return this.posToLineAndCh(this._lastSearchResult.from);
@@ -397,6 +515,16 @@ class CM6Adapter {
       to: () => {
         if (!this._lastSearchResult) return null;
         return this.posToLineAndCh(this._lastSearchResult.to);
+      },
+      matches: (reverse, start) => {
+        // 返回当前匹配的位置信息
+        if (!this._lastSearchResult) {
+          return { from: start, to: start };
+        }
+        return {
+          from: this.posToLineAndCh(this._lastSearchResult.from),
+          to: this.posToLineAndCh(this._lastSearchResult.to),
+        };
       },
     };
   }
@@ -699,7 +827,7 @@ export default class Editor {
       });
       
       if (existMarks.length === 0) {
-        this.markText(from, to, {
+        editor.markText(from, to, {
           className: 'cm-fullWidth',
           title: '按住Ctrl/Cmd点击切换成半角（Hold down Ctrl/Cmd and click to switch to half-width）',
         });
@@ -994,6 +1122,9 @@ export default class Editor {
       closeBrackets(),
       syntaxHighlighting(defaultHighlightStyle),
 
+      // 搜索高亮字段
+      searchHighlightField,
+
       // 条件性添加行号
       ...(this.options.codemirror.lineNumbers ? [lineNumbers()] : []),
 
@@ -1190,26 +1321,30 @@ export default class Editor {
    * @param {number} [percent] 百分比，取值0~1
    */
   jumpToLine(beginLine, endLine = 0, percent = 0) {
-    if (!this.editor) return;
+    if (!this.editor || !this.editor.view) return;
+    
+    const view = this.editor.view;
+    
     if (beginLine === null) {
       cancelAnimationFrame(this.animation.timer);
       this.disableScrollListener = true;
-      const doc = this.editor.state.doc;
+      const doc = view.state.doc;
       const lastLinePos = doc.length;
-      this.editor.dispatch({
+      view.dispatch({
         effects: EditorView.scrollIntoView(lastLinePos, { y: 'end' }),
       });
       this.animation.timer = 0;
       return;
     }
-    const doc = this.editor.state.doc;
+    
+    const doc = view.state.doc;
     const targetLineNumber = Math.min(beginLine + 1, doc.lines);
     const targetLine = doc.line(targetLineNumber);
     const endLineNumber = Math.min(beginLine + endLine + 1, doc.lines);
     const endLineObj = doc.line(endLineNumber);
 
-    const targetLineBlock = this.editor.lineBlockAt(targetLine.from);
-    const endLineBlock = this.editor.lineBlockAt(endLineObj.from);
+    const targetLineBlock = view.lineBlockAt(targetLine.from);
+    const endLineBlock = view.lineBlockAt(endLineObj.from);
 
     const height = endLineBlock.top - targetLineBlock.top;
     const targetTop = targetLineBlock.top + height * percent;
@@ -1221,7 +1356,7 @@ export default class Editor {
     }
 
     const animationHandler = () => {
-      const currentTop = this.editor.scrollDOM.scrollTop;
+      const currentTop = view.scrollDOM.scrollTop;
       const delta = this.animation.destinationTop - currentTop;
       // 100毫秒内完成动画
       const move = Math.ceil(Math.min(Math.abs(delta), Math.max(1, Math.abs(delta) / (100 / 16.7))));
@@ -1232,21 +1367,21 @@ export default class Editor {
           return;
         }
         this.disableScrollListener = true;
-        this.editor.scrollDOM.scrollTop = currentTop + move;
+        view.scrollDOM.scrollTop = currentTop + move;
       } else if (delta < 0) {
         if (currentTop <= this.animation.destinationTop || currentTop <= 0) {
           this.animation.timer = 0;
           return;
         }
         this.disableScrollListener = true;
-        this.editor.scrollDOM.scrollTop = currentTop - move;
+        view.scrollDOM.scrollTop = currentTop - move;
       } else {
         this.animation.timer = 0;
         return;
       }
 
       // 如果无法再继续滚动，或已到达目标，停止动画
-      if (currentTop === this.editor.scrollDOM.scrollTop || move >= Math.abs(delta)) {
+      if (currentTop === view.scrollDOM.scrollTop || move >= Math.abs(delta)) {
         this.animation.timer = 0;
         return;
       }

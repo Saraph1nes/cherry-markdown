@@ -468,8 +468,6 @@ export default class Previewer {
       const mdOffsetTop = mdRect.y - marginTop - domPosition.y;
       const lineNum = +targetElement.getAttribute('data-lines'); // 当前markdown元素所占行数
       const percent = (100 * Math.abs(mdOffsetTop)) / mdActualHeight / 100;
-      // console.log('destLine:', lines, percent,
-      //  mdRect.height + marginTop + marginBottom, mdOffsetTop, mdElement);
       // if(mdOffsetTop < 0) {
       return this.editor.scrollToLineNum(lines - lineNum, lineNum, percent);
       // }
@@ -1100,21 +1098,29 @@ export default class Previewer {
       }, 100);
     };
 
-    // 添加滚动结束事件监听器
-    scrollDom.addEventListener('scrollend', handleScrollEnd);
-
-    // 如果浏览器不支持 scrollend 事件，使用 setTimeout 作为后备方案
-    setTimeout(() => {
-      scrollDom.removeEventListener('scrollend', handleScrollEnd);
-      handleScrollEnd();
-    }, 1000);
-
     // 开始滚动
     scrollDom.scrollTo({
       top: scrollTop,
       left: 0,
       behavior,
     });
+
+    // 对于 instant 行为，立即触发位置修正逻辑
+    if (behavior === 'instant') {
+      // 使用 requestAnimationFrame 确保滚动完成后再处理
+      requestAnimationFrame(() => {
+        handleScrollEnd();
+      });
+    } else {
+      // 添加滚动结束事件监听器
+      scrollDom.addEventListener('scrollend', handleScrollEnd);
+
+      // 如果浏览器不支持 scrollend 事件，使用 setTimeout 作为后备方案
+      setTimeout(() => {
+        scrollDom.removeEventListener('scrollend', handleScrollEnd);
+        handleScrollEnd();
+      }, 1000);
+    }
 
     return true;
   }
@@ -1174,7 +1180,7 @@ export default class Previewer {
     const previewDom = this.getDomContainer();
     const targetHead = previewDom.querySelectorAll('h1,h2,h3,h4,h5,h6,h7,h8')[index] ?? false;
     if (targetHead !== false) {
-      this.scrollToId(targetHead.id);
+      this.scrollToId(targetHead.id, 'instant');
     }
   }
 

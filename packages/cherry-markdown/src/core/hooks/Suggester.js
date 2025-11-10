@@ -355,7 +355,7 @@ class SuggesterPanel {
       (evt) => {
         const idx = isChildNode(this.$suggesterPanel, evt.target);
         if (idx > -1) {
-          this.editor.editor.focus();
+          this.editor.editor.view.focus();
           this.pasteSelectResult(idx);
         }
         this.stopRelate();

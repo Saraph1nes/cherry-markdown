@@ -435,7 +435,7 @@ export default class Cherry extends CherryStatic {
    * @returns markdown源码内容
    */
   getValue() {
-    return this.editor.editor.state.doc.toString();
+    return this.editor.editor.view.state.doc.toString();
   }
 
   /**
@@ -1063,7 +1063,7 @@ export default class Cherry extends CherryStatic {
     // CodeMirror 6 使用事件系统，通过 $event 来监听变化
     this.$event.on('onChange', () => {
       cb({
-        markdown: this.editor.editor.state.doc.toString(), // CodeMirror 6 API
+        markdown: this.editor.editor.view.state.doc.toString(), // CodeMirror 6 API
       });
     });
   }
@@ -1074,9 +1074,9 @@ export default class Cherry extends CherryStatic {
    */
   fireShortcutKey(evt) {
     // 获取当前光标位置 - CodeMirror 6 API
-    const selection = this.editor.editor.state.selection.main;
+    const selection = this.editor.editor.view.state.selection.main;
     const pos = selection.head;
-    const line = this.editor.editor.state.doc.lineAt(pos);
+    const line = this.editor.editor.view.state.doc.lineAt(pos);
     const lineContent = line.text;
     const cursor = { line: line.number - 1, ch: pos - line.from };
 
@@ -1086,7 +1086,7 @@ export default class Cherry extends CherryStatic {
       if (cursor.ch === 0 || cursor.ch === lineContent.length || cursor.ch === lineContent.length + 1) {
         evt.preventDefault();
         // 使用 CodeMirror 6 API 替换整行内容
-        this.editor.editor.dispatch({
+        this.editor.editor.view.dispatch({
           changes: {
             from: line.from,
             to: line.to,

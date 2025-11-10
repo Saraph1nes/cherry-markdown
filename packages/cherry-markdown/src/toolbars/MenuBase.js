@@ -321,15 +321,15 @@ export default class MenuBase {
                 result === undefined || result === null ? selections[index] : String(result),
               );
               this.$replaceSelectionsWithCursor(safeResults);
-              this.editor.editor.focus();
               this.$afterClick();
+              this.editor.editor.view.focus();
             },
           );
         } else {
           // 处理同步结果
           this.$replaceSelectionsWithCursor(results);
-          this.editor.editor.focus();
           this.$afterClick();
+          this.editor.editor.view.focus();
         }
       }
     }
@@ -438,18 +438,33 @@ export default class MenuBase {
     const editorView = this.editor.editor;
     const cm = editorView.view || editorView;
     const { begin, end } = this.$getSelectionRange();
-    console.log('setLessSelection', { lessBefore, lessAfter, begin, end });
+    
     // 计算 lessBefore 的偏移量
     const lessBeforeLines = lessBefore.match(/\n/g)?.length || 0;
     const newBeginLine = lessBeforeLines > 0 ? begin.line + lessBeforeLines : begin.line;
+    const lessBeforeLastLine = lessBefore.replace(/^[\s\S]*?\n([^\n]*)$/, '$1');
     const newBeginCh =
-      lessBeforeLines > 0 ? lessBefore.replace(/^[\s\S]*?\n([^\n]*)$/, '$1').length : begin.ch + lessBefore.length;
+      lessBeforeLines > 0 ? lessBeforeLastLine.length : begin.ch + lessBefore.length;
 
     // 计算 lessAfter 的偏移量
     const lessAfterLines = lessAfter.match(/\n/g)?.length || 0;
     const newEndLine = lessAfterLines > 0 ? end.line - lessAfterLines : end.line;
-    const newEndCh =
-      lessAfterLines > 0 ? end.ch - lessAfter.replace(/^[\s\S]*?\n([^\n]*)$/, '$1').length : end.ch - lessAfter.length;
+    
+    // 修复：当 lessAfterLines > 0 时，我们移动到了新的行，
+    // newEndCh 应该是该行的实际长度，而不是基于 end.ch 计算
+    let newEndCh;
+    if (lessAfterLines > 0) {
+      // 获取目标行的内容长度
+      try {
+        const targetLine = cm.state.doc.line(newEndLine + 1);
+        newEndCh = targetLine.length;
+      } catch (e) {
+        console.warn('Error getting line length:', e);
+        newEndCh = 0;
+      }
+    } else {
+      newEndCh = end.ch - lessAfter.length;
+    }
 
     // 使用 CodeMirror 6 的方式设置选择
     const newFrom = cm.state.doc.line(newBeginLine + 1).from + newBeginCh;
