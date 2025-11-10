@@ -1167,9 +1167,43 @@ export default class Editor {
         if (update.selectionSet) {
           // 触发 beforeSelectionChange 事件,供 FloatMenu 和 Bubble 使用
           const selection = update.state.selection.main;
+          
+          // CodeMirror 6中判断是否是用户交互:
+          // 1. 如果有明确的select userEvent,肯定是用户交互
+          // 2. 如果没有userEvent标记,但selection确实改变了,也可能是用户鼠标选择
+          //    (CM6在鼠标选择时不总是生成select userEvent)
+          // 3. 排除编程方式触发的选择(比如setValue、replaceRange等会有对应的userEvent)
+          
+          let isUserInteraction = false;
+          
+          // 方法1: 检查是否有select相关的userEvent
+          if (update.transactions.some(tr => tr.isUserEvent('select'))) {
+            isUserInteraction = true;
+          }
+          // 方法2: 如果没有任何userEvent,但selection确实改变了,认为是用户交互
+          // (鼠标拖动选择通常不会产生userEvent)
+          else if (update.transactions.length > 0) {
+            const hasUserEvent = update.transactions.some(tr => {
+              const userEvent = tr.annotation ? tr.annotation.userEvent : null;
+              return userEvent !== null && userEvent !== undefined;
+            });
+            // 如果没有任何userEvent标记,很可能是鼠标选择
+            if (!hasUserEvent) {
+              isUserInteraction = true;
+            }
+          }
+          
+          console.log('Editor selectionChange:', {
+            isUserInteraction,
+            transactions: update.transactions.map(tr => ({
+              hasUserEvent: tr.annotation && tr.annotation.userEvent,
+              isSelectUserEvent: tr.isUserEvent('select'),
+            })),
+          });
+          
           this.$cherry.$event.emit('beforeSelectionChange', {
             selection: { from: selection.from, to: selection.to },
-            isUserInteraction: update.transactions.some((tr) => tr.isUserEvent('select')),
+            isUserInteraction,
           });
           adapter._emit('cursorActivity');
         }

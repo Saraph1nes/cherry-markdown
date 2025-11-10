@@ -427,7 +427,7 @@ export default class Previewer {
         return;
       }
       if (this.disableScrollListener) {
-        this.disableScrollListener = false;
+        // 如果正在动画滚动,不要重置标志,让动画继续控制
         return;
       }
       if (domContainer.scrollTop <= 0) {
@@ -478,11 +478,10 @@ export default class Previewer {
       domContainer,
       'wheel',
       () => {
-        // 鼠标滚轮滚动时，强制监听滚动事件
-        this.disableScrollListener = false;
-        // 打断滚动动画
+        // 鼠标滚轮滚动时,打断滚动动画并恢复监听
         cancelAnimationFrame(this.animation.timer);
         this.animation.timer = 0;
+        this.disableScrollListener = false;
       },
       false,
     );
@@ -1034,10 +1033,48 @@ export default class Previewer {
 
     let scrollTop = 0;
 
-    if (scrollDom.nodeName === 'HTML') {
-      scrollTop = scrollDom.scrollTop + target.getBoundingClientRect().y - 10;
+    // 尝试找到目标元素所在的data-sign块,使用精确的位置计算
+    let targetBlock = target;
+    while (targetBlock && targetBlock !== previewDom) {
+      if (targetBlock.hasAttribute('data-sign')) {
+        break;
+      }
+      targetBlock = targetBlock.parentElement;
+    }
+
+    // 如果找到了data-sign块,使用$getTopByLineNum的计算方式
+    if (targetBlock && targetBlock.hasAttribute('data-sign')) {
+      const doms = /** @type {NodeListOf<HTMLElement>}*/ (previewDom.querySelectorAll('[data-sign]'));
+      const containerY = previewDom.offsetTop;
+
+      for (let index = 0; index < doms.length; index++) {
+        if (doms[index].parentNode !== previewDom) {
+          continue;
+        }
+        if (doms[index] === targetBlock) {
+          // 找到目标块,使用精确的位置计算
+          const { offsetTop } = getBlockTopAndHeightWithMargin(doms[index]);
+          const blockY = offsetTop - containerY;
+
+          // 如果目标元素不是块本身,计算目标元素在块内的偏移
+          if (target !== targetBlock) {
+            const targetEl = /** @type {HTMLElement}*/ (target);
+            const targetBlockEl = /** @type {HTMLElement}*/ (targetBlock);
+            const targetOffsetInBlock = targetEl.offsetTop - targetBlockEl.offsetTop;
+            scrollTop = blockY + targetOffsetInBlock - 10;
+          } else {
+            scrollTop = blockY - 10;
+          }
+          break;
+        }
+      }
     } else {
-      scrollTop = scrollDom.scrollTop + target.getBoundingClientRect().y - scrollDom.getBoundingClientRect().y - 10;
+      // 没有找到data-sign块,使用原来的计算方式
+      if (scrollDom.nodeName === 'HTML') {
+        scrollTop = scrollDom.scrollTop + target.getBoundingClientRect().y - 10;
+      } else {
+        scrollTop = scrollDom.scrollTop + target.getBoundingClientRect().y - scrollDom.getBoundingClientRect().y - 10;
+      }
     }
 
     // 创建一个函数来清理图片样式并重新滚动
@@ -1138,11 +1175,12 @@ export default class Previewer {
       const dom = this.getDomContainer();
       const currentTop = dom.scrollTop;
       const delta = this.animation.destinationTop - currentTop;
-      // 100毫秒内完成动画
-      const move = Math.ceil(Math.min(Math.abs(delta), Math.max(1, Math.abs(delta) / (100 / 16.7))));
+      // 减小步进值,使滚动更平滑,从100ms改为200ms完成
+      const move = Math.ceil(Math.min(Math.abs(delta), Math.max(1, Math.abs(delta) / (200 / 16.7))));
       if (delta === 0 || currentTop >= dom.scrollHeight || move > Math.abs(delta)) {
         cancelAnimationFrame(this.animation.timer);
         this.animation.timer = 0;
+        this.disableScrollListener = false; // 动画结束后恢复滚动监听
         return;
       }
       this.disableScrollListener = true;
@@ -1180,7 +1218,7 @@ export default class Previewer {
     const previewDom = this.getDomContainer();
     const targetHead = previewDom.querySelectorAll('h1,h2,h3,h4,h5,h6,h7,h8')[index] ?? false;
     if (targetHead !== false) {
-      this.scrollToId(targetHead.id, 'instant');
+      this.scrollToId(targetHead.id);
     }
   }
 

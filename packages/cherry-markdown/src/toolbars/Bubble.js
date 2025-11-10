@@ -64,7 +64,13 @@ export default class Bubble extends Toolbar {
    * @returns {number} 编辑区域的滚动区域
    */
   getScrollTop() {
-    return this.options.editor.editor.scrollDOM.scrollTop;
+    const editorAdapter = this.options.editor.editor;
+    if (!editorAdapter) {
+      return 0;
+    }
+    // 兼容 CM6Adapter,获取真正的 EditorView
+    const view = editorAdapter.view || editorAdapter;
+    return view.scrollDOM ? view.scrollDOM.scrollTop : 0;
   }
 
   /**
@@ -182,6 +188,9 @@ export default class Bubble extends Toolbar {
       const { from, to } = selection;
       setTimeout(() => {
         const editorAdapter = this.options.editor.editor;
+        if (!editorAdapter) {
+          return;
+        }
         // 兼容 CM6Adapter,获取真正的 EditorView
         const view = editorAdapter.view || editorAdapter;
         const editorState = view.state;
@@ -213,6 +222,10 @@ export default class Bubble extends Toolbar {
         }
         try {
           const editorAdapter = this.options.editor.editor;
+          if (!editorAdapter) {
+            this.hideBubble();
+            return;
+          }
           // 兼容 CM6Adapter,获取真正的 EditorView
           const editorView = editorAdapter.view || editorAdapter;
 
