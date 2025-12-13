@@ -25,11 +25,131 @@ import htmlParser from '@/utils/htmlparser';
 import pasteHelper from '@/utils/pasteHelper';
 import Logger from '@/Logger';
 import { handleFileUploadCallback } from '@/utils/file';
-import { tags } from '@lezer/highlight';
+import { tagHighlighter, tags } from '@lezer/highlight';
 import { createElement } from './utils/dom';
 import { longTextReg, base64Reg, imgDrawioXmlReg, createUrlReg } from './utils/regexp';
 import { addEvent } from './utils/event';
 import { handleNewlineIndentList } from './utils/autoindent';
+
+/**
+ * 自定义语法高亮器 - 将 Lezer tags 映射为 CM5 风格的 cm-* 类名
+ * 用于保持与 CodeMirror 5 的样式兼容性
+ */
+const cherryHighlighter = tagHighlighter([
+  // 字符串相关
+  { tag: tags.string, class: 'cm-string' },
+  { tag: tags.special(tags.string), class: 'cm-string-2' },
+  
+  // 数字
+  { tag: tags.number, class: 'cm-number' },
+  
+  // 关键字
+  { tag: tags.keyword, class: 'cm-keyword' },
+  
+  // 注释
+  { tag: tags.comment, class: 'cm-comment' },
+  { tag: tags.lineComment, class: 'cm-comment' },
+  { tag: tags.blockComment, class: 'cm-comment' },
+  { tag: tags.docComment, class: 'cm-comment' },
+  
+  // 变量
+  { tag: tags.variableName, class: 'cm-variable' },
+  { tag: tags.definition(tags.variableName), class: 'cm-def' },
+  { tag: tags.function(tags.variableName), class: 'cm-variable-2' },
+  { tag: tags.local(tags.variableName), class: 'cm-variable' },
+  { tag: tags.special(tags.variableName), class: 'cm-variable-3' },
+  
+  // 属性
+  { tag: tags.propertyName, class: 'cm-property' },
+  { tag: tags.definition(tags.propertyName), class: 'cm-property' },
+  { tag: tags.special(tags.propertyName), class: 'cm-property' },
+  
+  // 操作符
+  { tag: tags.operator, class: 'cm-operator' },
+  { tag: tags.arithmeticOperator, class: 'cm-operator' },
+  { tag: tags.logicOperator, class: 'cm-operator' },
+  { tag: tags.bitwiseOperator, class: 'cm-operator' },
+  { tag: tags.compareOperator, class: 'cm-operator' },
+  { tag: tags.updateOperator, class: 'cm-operator' },
+  { tag: tags.definitionOperator, class: 'cm-operator' },
+  { tag: tags.controlOperator, class: 'cm-operator' },
+  { tag: tags.derefOperator, class: 'cm-operator' },
+  
+  // URL 和链接
+  { tag: tags.url, class: 'cm-url' },
+  { tag: tags.link, class: 'cm-link' },
+  
+  // 原子值
+  { tag: tags.atom, class: 'cm-atom' },
+  { tag: tags.bool, class: 'cm-atom' },
+  { tag: tags.null, class: 'cm-atom' },
+  { tag: tags.self, class: 'cm-atom' },
+  
+  // 元信息
+  { tag: tags.meta, class: 'cm-meta' },
+  { tag: tags.annotation, class: 'cm-meta' },
+  { tag: tags.modifier, class: 'cm-meta' },
+  
+  // 标题 (Markdown)
+  { tag: tags.heading, class: 'cm-header' },
+  { tag: tags.heading1, class: 'cm-header cm-header-1' },
+  { tag: tags.heading2, class: 'cm-header cm-header-2' },
+  { tag: tags.heading3, class: 'cm-header cm-header-3' },
+  { tag: tags.heading4, class: 'cm-header cm-header-4' },
+  { tag: tags.heading5, class: 'cm-header cm-header-5' },
+  { tag: tags.heading6, class: 'cm-header cm-header-6' },
+  
+  // 强调 (Markdown)
+  { tag: tags.emphasis, class: 'cm-em' },
+  { tag: tags.strong, class: 'cm-strong' },
+  { tag: tags.strikethrough, class: 'cm-strikethrough' },
+  
+  // 引用 (Markdown)
+  { tag: tags.quote, class: 'cm-quote' },
+  
+  // 列表 (Markdown)
+  { tag: tags.list, class: 'cm-list' },
+  
+  // 内容分隔符
+  { tag: tags.contentSeparator, class: 'cm-hr' },
+  
+  // 类型
+  { tag: tags.typeName, class: 'cm-type' },
+  { tag: tags.className, class: 'cm-type' },
+  { tag: tags.namespace, class: 'cm-qualifier' },
+  { tag: tags.labelName, class: 'cm-tag' },
+  
+  // 标签 (HTML/XML)
+  { tag: tags.tagName, class: 'cm-tag' },
+  { tag: tags.angleBracket, class: 'cm-bracket' },
+  { tag: tags.attributeName, class: 'cm-attribute' },
+  { tag: tags.attributeValue, class: 'cm-string' },
+  
+  // 括号
+  { tag: tags.paren, class: 'cm-bracket' },
+  { tag: tags.squareBracket, class: 'cm-bracket' },
+  { tag: tags.brace, class: 'cm-bracket' },
+  
+  // 标点
+  { tag: tags.punctuation, class: 'cm-punctuation' },
+  { tag: tags.separator, class: 'cm-punctuation' },
+  
+  // 转义
+  { tag: tags.escape, class: 'cm-escape' },
+  
+  // 正则表达式
+  { tag: tags.regexp, class: 'cm-string-2' },
+  
+  // 代码/内联代码 (Markdown)
+  { tag: tags.monospace, class: 'cm-comment' },
+  
+  // 处理中/无效
+  { tag: tags.processingInstruction, class: 'cm-meta' },
+  { tag: tags.invalid, class: 'cm-invalidchar' },
+  
+  // 特殊字符
+  { tag: tags.character, class: 'cm-string' },
+]);
 
 /**
  * @typedef {import('~types/editor').EditorConfiguration} EditorConfiguration
@@ -1115,6 +1235,7 @@ export default class Editor {
 
     // 创建 CodeMirror 6 编辑器
     const extensions = [
+      syntaxHighlighting(cherryHighlighter),
       // 基础扩展
       markdown(),
       history(),

@@ -817,10 +817,15 @@
     color: var(--editor-link-color);
   }
 
+  .cm-editor .cm-header {
+    text-decoration: none;
+  }
+
   .cm-editor .cm-url {
     background: var(--editor-url-bg-color);
     font-family: var(--font-family-mono);
     font-size: 0.9em;
+    text-decoration: none;
   }
 
   .cm-editor .cm-url-bracket {
