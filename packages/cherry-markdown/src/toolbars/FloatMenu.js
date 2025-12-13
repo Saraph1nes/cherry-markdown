@@ -25,7 +25,7 @@ export default class FloatMenu extends Toolbar {
   init() {
     this.editor = this.$cherry.editor;
     this.editorDom = this.editor.getEditorDom();
-    this.editorDom.querySelector('.CodeMirror-scroll').appendChild(this.options.dom);
+    this.editorDom.querySelector('.cm-scroller').appendChild(this.options.dom);
     this.initAction();
     Object.entries(this.shortcutKeyMap).forEach(([key, value]) => {
       this.$cherry.toolbar.shortcutKeyMap[key] = value;
@@ -37,23 +37,158 @@ export default class FloatMenu extends Toolbar {
   }
 
   initAction() {
-    const self = this;
-    this.editor.addListener('cursorActivity', (codemirror, evt) => {
-      // 当编辑区光标位置改变时触发
-      self.cursorActivity(evt, codemirror);
+    console.log('initAction this.editor', this.editor);
+
+    // 监听选区变化事件
+    this.$cherry.$event.on('selectionChange', (event) => {
+      this.handleSelectionChange(event);
     });
 
-    this.editor.addListener('update', (codemirror, evt) => {
-      // 当编辑区内容改变时触发
-      self.cursorActivity(evt, codemirror);
+    // 监听编辑器内容变化事件
+    this.$cherry.$event.on('onChange', () => {
+      this.handleContentChange();
     });
 
-    this.editor.addListener('refresh', (codemirror, evt) => {
-      // 当编辑器刷新时触发
-      setTimeout(() => {
-        self.cursorActivity(evt, codemirror);
-      }, 0);
+    // 监听清理子菜单事件
+    this.$cherry.$event.on('cleanAllSubMenus', () => {
+      this.hideFloatMenu();
     });
+
+    // 监听编辑器滚动事件
+    this.$cherry.$event.on('onScroll', () => {
+      this.hideFloatMenu();
+    });
+
+    // 监听beforeSelectionChange事件（这个事件在Editor.js中已经触发）
+    this.$cherry.$event.on('beforeSelectionChange', (event) => {
+      this.handleBeforeSelectionChange(event);
+    });
+  }
+
+  /**
+   * 处理选区变化
+   * @param {Object} event 选区变化事件
+   */
+  handleSelectionChange(event) {
+    if (this.editor && this.editor.editor) {
+      const editorAdapter = this.editor.editor;
+      const view = editorAdapter.view || editorAdapter;
+      const selection = view.state.selection.main;
+      const line = view.state.doc.lineAt(selection.head);
+      const pos = { line: line.number - 1 };
+
+      // 创建兼容的 CodeMirror 对象
+      const compatCodeMirror = this.createCompatCodeMirror();
+      this.cursorActivity(null, compatCodeMirror);
+    }
+  }
+
+  /**
+   * 处理内容变化
+   */
+  handleContentChange() {
+    if (this.editor && this.editor.editor) {
+      const compatCodeMirror = this.createCompatCodeMirror();
+      this.cursorActivity(null, compatCodeMirror);
+    }
+  }
+
+  /**
+   * 处理beforeSelectionChange事件
+   * @param {Object} selection 选区对象
+   */
+  handleBeforeSelectionChange({ selection }) {
+    if (this.editor && this.editor.editor) {
+      const compatCodeMirror = this.createCompatCodeMirror();
+      this.cursorActivity(null, compatCodeMirror);
+    }
+  }
+
+  /**
+   * 创建兼容的 CodeMirror 对象
+   * @returns {Object} 兼容的 CodeMirror 对象
+   */
+  createCompatCodeMirror() {
+    if (!this.editor || !this.editor.editor) {
+      return null;
+    }
+
+    const editorAdapter = this.editor.editor;
+    // 兼容 CM6Adapter,获取真正的 EditorView
+    const view = editorAdapter.view || editorAdapter;
+    const state = view.state;
+    const selection = state.selection.main;
+    const line = state.doc.lineAt(selection.head);
+
+    return {
+      getCursor: () => ({ line: line.number - 1 }),
+      getLine: (lineNum) => {
+        try {
+          return state.doc.line(lineNum + 1).text;
+        } catch (e) {
+          return '';
+        }
+      },
+      getSelections: () => {
+        return state.selection.ranges.map((range) => state.doc.sliceString(range.from, range.to));
+      },
+      getSelection: () => {
+        return state.doc.sliceString(selection.from, selection.to);
+      },
+      getDoc: () => ({
+        eachLine: (start, end, callback) => {
+          for (let i = start; i < end && i < state.doc.lines; i++) {
+            try {
+              const docLine = state.doc.line(i + 1);
+              // 尝试使用 coordsAtPos 获取更精确的行高
+              let lineHeight = 20; // 默认行高
+              try {
+                const startCoords = view.coordsAtPos(docLine.from);
+                const endCoords = view.coordsAtPos(docLine.to);
+                if (startCoords && endCoords) {
+                  lineHeight = Math.max(startCoords.bottom - startCoords.top, 20);
+                }
+              } catch (coordsError) {
+                // 如果 coordsAtPos 失败，使用默认行高
+                console.warn('Failed to get coords for line height:', coordsError);
+              }
+              callback({ height: lineHeight });
+            } catch (e) {
+              break;
+            }
+          }
+        },
+      }),
+      // 添加对 coordsAtPos 的支持
+      coordsAtPos: (pos) => {
+        try {
+          return view.coordsAtPos(pos);
+        } catch (e) {
+          return null;
+        }
+      },
+    };
+  }
+
+  /**
+   * 隐藏浮动菜单
+   */
+  hideFloatMenu() {
+    if (this.options.dom) {
+      this.options.dom.style.display = 'none';
+    }
+  }
+
+  /**
+   * 清理事件监听器
+   */
+  destroy() {
+    // 移除 Cherry 事件监听
+    this.$cherry.$event.off('selectionChange', this.handleSelectionChange);
+    this.$cherry.$event.off('onChange', this.handleContentChange);
+    this.$cherry.$event.off('cleanAllSubMenus', this.hideFloatMenu);
+    this.$cherry.$event.off('onScroll', this.hideFloatMenu);
+    this.$cherry.$event.off('beforeSelectionChange', this.handleBeforeSelectionChange);
   }
 
   update(evt, codeMirror) {
@@ -73,23 +208,114 @@ export default class FloatMenu extends Toolbar {
    */
   cursorActivity(evt, codeMirror) {
     const pos = codeMirror.getCursor();
-    const codeMirrorLines = document.querySelector('.cherry-editor .CodeMirror-lines');
-    if (!codeMirrorLines) {
+    const codeMirrorLines = document.querySelector('.cherry-editor .cm-editor');
+    if (!codeMirrorLines || !(codeMirrorLines instanceof HTMLElement)) {
       return false;
     }
-    const computedLinesStyle = getComputedStyle(codeMirrorLines);
-    const parsedPaddingLeft = Number.parseFloat(computedLinesStyle.paddingLeft);
-    const parsedPaddingTop = Number.parseFloat(computedLinesStyle.paddingTop);
-    const codeWrapPaddingLeft = Number.isFinite(parsedPaddingLeft) ? parsedPaddingLeft : 0;
-    const codeWrapPaddingTop = Number.isFinite(parsedPaddingTop) ? parsedPaddingTop : 0;
-    // const cursorHandle = codeMirror.getLineHandle(pos.line);
-    // const verticalMiddle = cursorHandle.height * 1 / 2;
 
     if (this.isHidden(pos.line, codeMirror)) {
       this.options.dom.style.display = 'none';
       return false;
     }
+
     this.options.dom.style.display = 'inline-block';
+
+    // 使用更精确的位置计算方法，参考 Bubble.js 的实现
+    this.calculateFloatMenuPosition(pos, codeMirror, codeMirrorLines);
+  }
+
+  /**
+   * 计算浮动菜单的精确位置
+   * @param {Object} pos 光标位置对象
+   * @param {Object} codeMirror 兼容的 CodeMirror 对象
+   * @param {HTMLElement} codeMirrorLines 编辑器 DOM 元素
+   */
+  calculateFloatMenuPosition(pos, codeMirror, codeMirrorLines) {
+    // 确保 codeMirrorLines 是 HTMLElement
+    if (!(codeMirrorLines instanceof HTMLElement)) {
+      return;
+    }
+    try {
+      const editorAdapter = this.editor.editor;
+      if (!editorAdapter) {
+        return;
+      }
+
+      // 兼容 CM6Adapter,获取真正的 EditorView
+      const editorView = editorAdapter.view || editorAdapter;
+
+      // 获取当前行的起始位置
+      const lineStart = editorView.state.doc.line(pos.line + 1).from;
+
+      // 使用 coordsAtPos 获取精确坐标
+      const coords = editorView.coordsAtPos(lineStart);
+      if (!coords) {
+        return;
+      }
+
+      // 获取编辑器容器位置
+      const editorPosition = this.editorDom.getBoundingClientRect();
+      // 获取滚动容器的位置和滚动距离
+      const scrollDOM = editorView.scrollDOM;
+      const scrollTop = scrollDOM.scrollTop;
+
+      // 计算相对于编辑器的位置，需要加上滚动距离
+      // coords.top 是视口坐标，减去编辑器顶部得到相对位置，再加上滚动距离得到在内容中的绝对位置
+      const top = coords.top - editorPosition.top + scrollTop;
+      let left = coords.left - editorPosition.left;
+
+      // 获取编辑器样式
+      const computedLinesStyle = getComputedStyle(codeMirrorLines);
+      const parsedPaddingLeft = Number.parseFloat(computedLinesStyle.paddingLeft);
+      const parsedPaddingTop = Number.parseFloat(computedLinesStyle.paddingTop);
+      const codeWrapPaddingLeft = Number.isFinite(parsedPaddingLeft) ? parsedPaddingLeft : 0;
+      const codeWrapPaddingTop = Number.isFinite(parsedPaddingTop) ? parsedPaddingTop : 0;
+
+      // 处理 placeholder 的情况
+      const placeholderEl = codeMirrorLines.querySelector('.CodeMirror-placeholder');
+      if (placeholderEl instanceof HTMLElement && placeholderEl.offsetParent !== null) {
+        const linesRect = codeMirrorLines.getBoundingClientRect();
+        const textNode = Array.from(placeholderEl.childNodes).find(
+          (n) => n.nodeType === Node.TEXT_NODE && n.nodeValue && n.nodeValue.trim() !== '',
+        );
+
+        if (textNode) {
+          const range = document.createRange();
+          range.setStart(textNode, 0);
+          range.setEnd(textNode, textNode.nodeValue.length);
+          const rects = range.getClientRects();
+          const lastRect = rects[rects.length - 1];
+          const placeholderRightRelative = Math.max(0, lastRect.right - linesRect.left);
+          left = placeholderRightRelative - 80; // 调整偏移量
+        }
+      } else {
+        // 没有 placeholder 时，使用默认的左边距
+        left = codeWrapPaddingLeft;
+      }
+
+      // 设置位置
+      this.options.dom.style.left = `${left}px`;
+      this.options.dom.style.top = `${top + codeWrapPaddingTop}px`;
+    } catch (error) {
+      console.warn('Error calculating float menu position:', error);
+      // 降级到原有的计算方式
+      this.fallbackPositionCalculation(pos, codeMirror, codeMirrorLines);
+    }
+  }
+
+  /**
+   * 降级的位置计算方法（保留原有逻辑作为备用）
+   * @param {Object} pos 光标位置对象
+   * @param {Object} codeMirror 兼容的 CodeMirror 对象
+   * @param {HTMLElement} codeMirrorLines 编辑器 DOM 元素
+   */
+  fallbackPositionCalculation(pos, codeMirror, codeMirrorLines) {
+    const computedLinesStyle = getComputedStyle(codeMirrorLines);
+    const parsedPaddingLeft = Number.parseFloat(computedLinesStyle.paddingLeft);
+    const parsedPaddingTop = Number.parseFloat(computedLinesStyle.paddingTop);
+    const codeWrapPaddingLeft = Number.isFinite(parsedPaddingLeft) ? parsedPaddingLeft : 0;
+    const codeWrapPaddingTop = Number.isFinite(parsedPaddingTop) ? parsedPaddingTop : 0;
+
     this.options.dom.style.left = `${codeWrapPaddingLeft}px`;
 
     // 当配置 codemirror.placeholder 时，测量 placeholder 中文本的范围
@@ -111,7 +337,6 @@ export default class FloatMenu extends Toolbar {
     }
     this.options.dom.style.top = `${topOffset + codeWrapPaddingTop}px`;
   }
-
   /**
    * 判断是否需要隐藏Float工具栏
    * 有选中内容，或者光标所在行有内容时隐藏float 工具栏
@@ -141,11 +366,30 @@ export default class FloatMenu extends Toolbar {
    * @returns
    */
   getLineHeight(line, codeMirror) {
-    let height = 0;
-    codeMirror.getDoc().eachLine(0, line, (line) => {
-      height += line.height;
-    });
+    // CodeMirror 6 中需要重新实现行高计算
+    const editorAdapter = this.editor.editor;
+    if (!editorAdapter) {
+      return line * 20; // 默认行高
+    }
 
-    return height;
+    // 兼容 CM6Adapter,获取真正的 EditorView
+    const editorView = editorAdapter.view || editorAdapter;
+
+    try {
+      // 获取指定行的起始位置
+      const lineStart = editorView.state.doc.line(line + 1).from;
+
+      // 使用 coordsAtPos 获取行坐标
+      const coords = editorView.coordsAtPos(lineStart);
+      if (coords) {
+        // 返回行顶部位置
+        return coords.top - editorView.scrollDOM.getBoundingClientRect().top;
+      }
+    } catch (error) {
+      console.warn('Error getting line height:', error);
+    }
+
+    // 降级方案：使用默认行高
+    return line * 20;
   }
 }
