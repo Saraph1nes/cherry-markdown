@@ -53,6 +53,15 @@ export default class SearchBox {
    */
   constructor($cherry) {
     this.$cherry = $cherry;
+    // CodeMirror 6: 在实例中存储搜索状态，而不是在 cm.state 上
+    this.searchState = {
+      posFrom: null,
+      posTo: null,
+      lastQuery: null,
+      query: null,
+      overlay: null,
+      annotate: null,
+    };
   }
 
   init(cm) {
@@ -325,7 +334,8 @@ export default class SearchBox {
       is = next();
 
       if (is) {
-        cm.setCursor(cm.doc.size - 1, 0);
+        // CodeMirror 6: 使用 lineCount() 获取总行数
+        cm.setCursor(cm.lineCount() - 1, 0);
         this.$find(value, options, callback);
         done = true;
       }
@@ -413,7 +423,8 @@ export default class SearchBox {
 
   toggleReplace() {
     const { cm } = this;
-    const cmEle = cm.display.wrapper;
+    // CodeMirror 6: 使用 view.dom 获取编辑器 DOM
+    const cmEle = cm.view.dom;
     if (cmEle.parentElement.querySelector('[action=toggleReplace]').innerText === '+') {
       cmEle.parentElement.querySelector('[action=toggleReplace]').innerText = '-';
       this.replaceBox.style.display = '';
@@ -494,15 +505,15 @@ export default class SearchBox {
   startSearch(cm, state, query, caseSensitive) {
     state.queryText = query;
     state.query = this.parseQuery(query);
-    cm.removeOverlay(state.overlay, this.queryCaseInsensitive(state.query, caseSensitive));
-    state.overlay = this.searchOverlay(state.query, this.queryCaseInsensitive(state.query, caseSensitive));
-    cm.addOverlay(state.overlay);
-    if (cm.showMatchesOnScrollbar) {
-      if (state.annotate) {
-        state.annotate.clear();
-        state.annotate = null;
-      }
-      state.annotate = cm.showMatchesOnScrollbar(state.query, this.queryCaseInsensitive(state.query, caseSensitive));
+    
+    // CodeMirror 6: 使用 setSearchQuery 触发搜索高亮
+    const isRegex = state.query instanceof RegExp;
+    const searchString = isRegex ? state.query.source : query;
+    cm.setSearchQuery(searchString, caseSensitive, isRegex);
+    
+    if (state.annotate) {
+      state.annotate.clear();
+      state.annotate = null;
     }
   }
 
@@ -535,31 +546,24 @@ export default class SearchBox {
   }
 
   getSearchState(cm) {
-    return (
-      cm.state.search ||
-      (cm.state.search = {
-        posFrom: null,
-        posTo: null,
-        lastQuery: null,
-        query: null,
-        overlay: null,
-      })
-    );
+    // CodeMirror 6: 从实例中返回搜索状态
+    return this.searchState;
   }
 
   clearSearch(cm) {
-    cm.operation(() => {
-      const state = this.getSearchState(cm);
-      state.lastQuery = state.query;
-      if (!state.query) return;
-      state.query = null;
-      state.queryText = null;
-      cm.removeOverlay(state.overlay);
-      if (state.annotate) {
-        state.annotate.clear();
-        state.annotate = null;
-      }
-    });
+    // CodeMirror 6: 清除搜索高亮
+    cm.clearSearchQuery();
+    
+    const state = this.getSearchState(cm);
+    state.lastQuery = state.query;
+    if (!state.query) return;
+    state.query = null;
+    state.queryText = null;
+    
+    if (state.annotate) {
+      state.annotate.clear();
+      state.annotate = null;
+    }
   }
 
   updateCount() {
@@ -588,7 +592,8 @@ export default class SearchBox {
       matches = cm.getValue().match(reg);
     }
     const count = matches ? matches.length : 0;
-    const cmEle = cm.display.wrapper;
+    // CodeMirror 6: 使用 view.dom 获取编辑器 DOM
+    const cmEle = cm.view.dom;
     const countEle = cmEle.parentElement.querySelector('.ace_search_counter');
     if (countEle) {
       countEle.innerText = `${count} ${this.$cherry.locale.matchesFoundText}`;
