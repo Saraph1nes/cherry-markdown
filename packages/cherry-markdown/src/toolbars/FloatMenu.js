@@ -47,16 +47,6 @@ export default class FloatMenu extends Toolbar {
       this.handleContentChange();
     });
 
-    // 监听清理子菜单事件
-    this.$cherry.$event.on('cleanAllSubMenus', () => {
-      this.hideFloatMenu();
-    });
-
-    // 监听编辑器滚动事件
-    this.$cherry.$event.on('onScroll', () => {
-      this.hideFloatMenu();
-    });
-
     // 监听beforeSelectionChange事件（这个事件在Editor.js中已经触发）
     this.$cherry.$event.on('beforeSelectionChange', (event) => {
       this.handleBeforeSelectionChange(event);
@@ -172,6 +162,7 @@ export default class FloatMenu extends Toolbar {
    * 隐藏浮动菜单
    */
   hideFloatMenu() {
+    console.log('hideFloatMenu');
     if (this.options.dom) {
       this.options.dom.style.display = 'none';
     }
@@ -201,145 +192,55 @@ export default class FloatMenu extends Toolbar {
   /**
    * 当光标激活时触发，当光标处于行起始位置时展示float工具栏；反之隐藏
    * @param {Event} evt
-   * @param {CodeMirror.Editor} codeMirror
+   * @param {Object} codeMirror 兼容的 CodeMirror 对象
    * @returns
    */
   cursorActivity(evt, codeMirror) {
     const pos = codeMirror.getCursor();
-    const codeMirrorLines = document.querySelector('.cherry-editor .cm-editor');
+    // CM6 使用 .cm-content 作为内容区域
+    const codeMirrorLines = document.querySelector('.cherry-editor .cm-content');
     if (!codeMirrorLines || !(codeMirrorLines instanceof HTMLElement)) {
       return false;
     }
+    const computedLinesStyle = getComputedStyle(codeMirrorLines);
+    const parsedPaddingLeft = Number.parseFloat(computedLinesStyle.paddingLeft);
+    const codeWrapPaddingLeft = Number.isFinite(parsedPaddingLeft) ? parsedPaddingLeft : 0;
 
     if (this.isHidden(pos.line, codeMirror)) {
       this.options.dom.style.display = 'none';
       return false;
     }
-
     this.options.dom.style.display = 'inline-block';
-
-    // 使用更精确的位置计算方法，参考 Bubble.js 的实现
-    this.calculateFloatMenuPosition(pos, codeMirror, codeMirrorLines);
-  }
-
-  /**
-   * 计算浮动菜单的精确位置
-   * @param {Object} pos 光标位置对象
-   * @param {Object} codeMirror 兼容的 CodeMirror 对象
-   * @param {HTMLElement} codeMirrorLines 编辑器 DOM 元素
-   */
-  calculateFloatMenuPosition(pos, codeMirror, codeMirrorLines) {
-    // 确保 codeMirrorLines 是 HTMLElement
-    if (!(codeMirrorLines instanceof HTMLElement)) {
-      return;
-    }
-    try {
-      const editorAdapter = this.editor.editor;
-      if (!editorAdapter) {
-        return;
-      }
-
-      // 兼容 CM6Adapter,获取真正的 EditorView
-      const editorView = editorAdapter.view || editorAdapter;
-
-      // 获取当前行的起始位置
-      const lineStart = editorView.state.doc.line(pos.line + 1).from;
-
-      // 使用 coordsAtPos 获取精确坐标
-      const coords = editorView.coordsAtPos(lineStart);
-      if (!coords) {
-        return;
-      }
-
-      // 获取编辑器容器位置
-      const editorPosition = this.editorDom.getBoundingClientRect();
-      // 获取滚动容器的位置和滚动距离
-      const scrollDOM = editorView.scrollDOM;
-      const scrollTop = scrollDOM.scrollTop;
-
-      // 计算相对于编辑器的位置，需要加上滚动距离
-      // coords.top 是视口坐标，减去编辑器顶部得到相对位置，再加上滚动距离得到在内容中的绝对位置
-      const top = coords.top - editorPosition.top + scrollTop;
-      let left = coords.left - editorPosition.left;
-
-      // 获取编辑器样式
-      const computedLinesStyle = getComputedStyle(codeMirrorLines);
-      const parsedPaddingLeft = Number.parseFloat(computedLinesStyle.paddingLeft);
-      const parsedPaddingTop = Number.parseFloat(computedLinesStyle.paddingTop);
-      const codeWrapPaddingLeft = Number.isFinite(parsedPaddingLeft) ? parsedPaddingLeft : 0;
-      const codeWrapPaddingTop = Number.isFinite(parsedPaddingTop) ? parsedPaddingTop : 0;
-
-      // 处理 placeholder 的情况
-      const placeholderEl = codeMirrorLines.querySelector('.CodeMirror-placeholder');
-      if (placeholderEl instanceof HTMLElement && placeholderEl.offsetParent !== null) {
-        const linesRect = codeMirrorLines.getBoundingClientRect();
-        const textNode = Array.from(placeholderEl.childNodes).find(
-          (n) => n.nodeType === Node.TEXT_NODE && n.nodeValue && n.nodeValue.trim() !== '',
-        );
-
-        if (textNode) {
-          const range = document.createRange();
-          range.setStart(textNode, 0);
-          range.setEnd(textNode, textNode.nodeValue.length);
-          const rects = range.getClientRects();
-          const lastRect = rects[rects.length - 1];
-          const placeholderRightRelative = Math.max(0, lastRect.right - linesRect.left);
-          left = placeholderRightRelative - 80; // 调整偏移量
-        }
-      } else {
-        // 没有 placeholder 时，使用默认的左边距
-        left = codeWrapPaddingLeft;
-      }
-
-      // 设置位置
-      this.options.dom.style.left = `${left}px`;
-      this.options.dom.style.top = `${top + codeWrapPaddingTop}px`;
-    } catch (error) {
-      console.warn('Error calculating float menu position:', error);
-      // 降级到原有的计算方式
-      this.fallbackPositionCalculation(pos, codeMirror, codeMirrorLines);
-    }
-  }
-
-  /**
-   * 降级的位置计算方法（保留原有逻辑作为备用）
-   * @param {Object} pos 光标位置对象
-   * @param {Object} codeMirror 兼容的 CodeMirror 对象
-   * @param {HTMLElement} codeMirrorLines 编辑器 DOM 元素
-   */
-  fallbackPositionCalculation(pos, codeMirror, codeMirrorLines) {
-    const computedLinesStyle = getComputedStyle(codeMirrorLines);
-    const parsedPaddingLeft = Number.parseFloat(computedLinesStyle.paddingLeft);
-    const parsedPaddingTop = Number.parseFloat(computedLinesStyle.paddingTop);
-    const codeWrapPaddingLeft = Number.isFinite(parsedPaddingLeft) ? parsedPaddingLeft : 0;
-    const codeWrapPaddingTop = Number.isFinite(parsedPaddingTop) ? parsedPaddingTop : 0;
-
     this.options.dom.style.left = `${codeWrapPaddingLeft}px`;
 
     // 当配置 codemirror.placeholder 时，测量 placeholder 中文本的范围
     // 将浮动工具栏定位到 placeholder 文本后面
-    const placeholderEl = codeMirrorLines.querySelector('.CodeMirror-placeholder');
+    // CM6 使用 .cm-placeholder 类名
+    const placeholderEl = codeMirrorLines.querySelector('.cm-placeholder');
     const topOffset = this.getLineHeight(pos.line, codeMirror);
     if (placeholderEl instanceof HTMLElement && placeholderEl.offsetParent !== null) {
       const linesRect = codeMirrorLines.getBoundingClientRect();
       const textNode = Array.from(placeholderEl.childNodes).find(
         (n) => n.nodeType === Node.TEXT_NODE && n.nodeValue && n.nodeValue.trim() !== '',
       );
-      const range = document.createRange();
-      range.setStart(textNode, 0);
-      range.setEnd(textNode, textNode.nodeValue.length);
-      const rects = range.getClientRects();
-      const lastRect = rects[rects.length - 1];
-      const placeholderRightRelative = Math.max(0, lastRect.right - linesRect.left);
-      this.options.dom.style.left = `${placeholderRightRelative + codeWrapPaddingLeft - 80}px`;
+      if (textNode) {
+        const range = document.createRange();
+        range.setStart(textNode, 0);
+        range.setEnd(textNode, textNode.nodeValue.length);
+        const rects = range.getClientRects();
+        const lastRect = rects[rects.length - 1];
+        const placeholderRightRelative = Math.max(0, lastRect.right - linesRect.left);
+        this.options.dom.style.left = `${placeholderRightRelative + codeWrapPaddingLeft - 80}px`;
+      }
     }
-    this.options.dom.style.top = `${topOffset + codeWrapPaddingTop}px`;
+    this.options.dom.style.top = `${topOffset}px`;
   }
+
   /**
    * 判断是否需要隐藏Float工具栏
    * 有选中内容，或者光标所在行有内容时隐藏float 工具栏
    * @param {number} line
-   * @param {CodeMirror.Editor} codeMirror
+   * @param {Object} codeMirror 兼容的 CodeMirror 对象
    * @returns {boolean} 是否需要隐藏float工具栏，true：需要隐藏
    */
   isHidden(line, codeMirror) {
@@ -358,10 +259,10 @@ export default class FloatMenu extends Toolbar {
   }
 
   /**
-   * 获取对应行的行高度，用来让float 工具栏在该行保持垂直居中
-   * @param {number} line
-   * @param {CodeMirror.Editor} codeMirror
-   * @returns
+   * 获取对应行的顶部偏移量，用来定位 float 工具栏
+   * @param {number} line 0-indexed 行号
+   * @param {Object} codeMirror 兼容的 CodeMirror 对象
+   * @returns {number}
    */
   getLineHeight(line, codeMirror) {
     // CodeMirror 6 中需要重新实现行高计算
@@ -374,14 +275,26 @@ export default class FloatMenu extends Toolbar {
     const editorView = editorAdapter.view || editorAdapter;
 
     try {
-      // 获取指定行的起始位置
-      const lineStart = editorView.state.doc.line(line + 1).from;
+      // line 是 0-indexed，doc.line 需要 1-indexed
+      const docLine = editorView.state.doc.line(line + 1);
 
-      // 使用 coordsAtPos 获取行坐标
-      const coords = editorView.coordsAtPos(lineStart);
-      if (coords) {
-        // 返回行顶部位置
-        return coords.top - editorView.scrollDOM.getBoundingClientRect().top;
+      // 使用 coordsAtPos 获取行的顶部坐标
+      const topCoords = editorView.coordsAtPos(docLine.from);
+      if (topCoords) {
+        const scrollerRect = editorView.scrollDOM.getBoundingClientRect();
+        const { scrollTop } = editorView.scrollDOM;
+
+        // 计算行顶部相对于 .cm-scroller 的位置（因为浮动菜单是挂载在 .cm-scroller 下）
+        const lineTop = topCoords.top - scrollerRect.top + scrollTop;
+
+        // 获取行的实际高度
+        const lineHeight = topCoords.bottom - topCoords.top;
+
+        // 获取浮动菜单的高度
+        const menuHeight = this.options.dom ? this.options.dom.offsetHeight : 26;
+
+        // 返回垂直居中的位置：行顶部 + (行高 - 菜单高度) / 2
+        return lineTop + (lineHeight - menuHeight) / 2;
       }
     } catch (error) {
       console.warn('Error getting line height:', error);
