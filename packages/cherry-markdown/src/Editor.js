@@ -17,7 +17,7 @@
 import { EditorView, keymap, placeholder, lineNumbers, Decoration, WidgetType } from '@codemirror/view';
 import { EditorState, StateEffect, StateField, EditorSelection } from '@codemirror/state';
 import { markdown } from '@codemirror/lang-markdown';
-import { search, SearchQuery, setSearchQuery } from '@codemirror/search';
+import { search, searchKeymap, SearchQuery, setSearchQuery } from '@codemirror/search';
 import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
@@ -1254,6 +1254,7 @@ export default class Editor {
         ...defaultKeymap,
         ...historyKeymap,
         ...closeBracketsKeymap,
+        ...searchKeymap,
         indentWithTab,
         {
           key: 'Enter',
