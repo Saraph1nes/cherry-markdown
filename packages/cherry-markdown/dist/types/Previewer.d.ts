@@ -9,7 +9,7 @@ export default class Previewer {
      *
      * @param {Partial<import('~types/previewer').PreviewerOptions>} options 预览区域设置
      */
-    constructor(options: Partial<import('~types/previewer').PreviewerOptions>);
+    constructor(options: Partial<import("~types/previewer").PreviewerOptions>);
     /**
      * @property
      * @private
@@ -32,7 +32,7 @@ export default class Previewer {
      * @property
      * @type {import('~types/previewer').PreviewerOptions}
      */
-    options: import('~types/previewer').PreviewerOptions;
+    options: import("~types/previewer").PreviewerOptions;
     $cherry: import("./Cherry").default;
     instanceId: string;
     /**
@@ -138,14 +138,14 @@ export default class Previewer {
      * @param {number} scrollTop 元素的id属性值
      * @param {'auto'|'smooth'|'instant'} behavior 滚动方式
      */
-    scrollToTop(scrollTop: number, behavior?: 'auto' | 'smooth' | 'instant'): void;
+    scrollToTop(scrollTop: number, behavior?: "auto" | "smooth" | "instant"): void;
     /**
      * 滚动到对应id的位置，实现锚点滚动能力
      * @param {string} id 元素的id属性值
      * @param {'smooth'|'instant'|'auto'} behavior 滚动方式
      * @return {boolean} 是否有对应id的元素并执行滚动
      */
-    scrollToId(id: string, behavior?: 'smooth' | 'instant' | 'auto'): boolean;
+    scrollToId(id: string, behavior?: "smooth" | "instant" | "auto"): boolean;
     /**
      * 实现滚动动画
      * @param { Number } targetY 目标位置
@@ -166,8 +166,8 @@ export default class Previewer {
      * 'pdf'：导出成pdf文件; 'img' | screenShot：导出成png图片; 'markdown'：导出成markdown文件; 'html'：导出成html文件; 'word'：导出到Word（复制到剪贴板）;
      * @param {string} [fileName] 导出文件名
      */
-    public export(type?: 'pdf' | 'img' | 'screenShot' | 'markdown' | 'html' | 'word', fileName?: string): void;
+    public export(type?: "pdf" | "img" | "screenShot" | "markdown" | "html" | "word", fileName?: string): void;
     changePreviewToMobile(isMobile?: boolean): void;
 }
-import LazyLoadImg from "@/utils/lazyLoadImg";
-import PreviewerBubble from "./toolbars/PreviewerBubble";
+import LazyLoadImg from '@/utils/lazyLoadImg';
+import PreviewerBubble from './toolbars/PreviewerBubble';

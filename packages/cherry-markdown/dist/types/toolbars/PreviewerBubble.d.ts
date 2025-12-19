@@ -6,17 +6,17 @@ export default class PreviewerBubble {
      *
      * @param {import('../Previewer').default} previewer
      */
-    constructor(previewer: import('../Previewer').default);
+    constructor(previewer: import("../Previewer").default);
     /**
      * @property
      * @type {import('../Previewer').default}
      */
-    previewer: import('../Previewer').default;
+    previewer: import("../Previewer").default;
     /**
      * @property
      * @type {import('../Editor').default}
      */
-    editor: import('../Editor').default;
+    editor: import("../Editor").default;
     previewerDom: HTMLDivElement;
     $cherry: import("..").default;
     /**
@@ -32,8 +32,8 @@ export default class PreviewerBubble {
      */
     bubbleHandler: {
         [key: string]: {
-            [key: string]: any;
             emit: (...args: any[]) => any;
+            [key: string]: any;
         };
     };
     init(): void;
@@ -178,4 +178,4 @@ export default class PreviewerBubble {
     $showBorderBubbles(): void;
     $showBtnBubbles(): void;
 }
-import TableHandler from "@/utils/tableContentHandler";
+import TableHandler from '@/utils/tableContentHandler';

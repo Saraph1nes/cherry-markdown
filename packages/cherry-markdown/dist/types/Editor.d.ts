@@ -1,8 +1,3 @@
-/**
- * @typedef {import('~types/editor').EditorConfiguration} EditorConfiguration
- * @typedef {import('~types/editor').EditorEventCallback} EditorEventCallback
- * @typedef {import('codemirror')} CodeMirror
- */
 /** @type {import('~types/editor')} */
 export default class Editor {
     /**
@@ -15,15 +10,15 @@ export default class Editor {
      * @type {EditorConfiguration}
      */
     options: EditorConfiguration;
-    /**
-     * @property
-     * @private
-     * @type {{ timer?: number; destinationTop?: number }}
-     */
-    private animation;
-    selectAll: boolean;
+    /** @type {CM6AdapterType | null} */
+    editor: CM6AdapterType | null;
+    animation: {
+        timer: number;
+        destinationTop: number;
+    };
+    disableScrollListener: boolean;
     $cherry: import("./Cherry").default;
-    instanceId: string;
+    refresh(): void;
     /**
      * 禁用快捷键
      * @param {boolean} disable 是否禁用快捷键
@@ -41,49 +36,53 @@ export default class Editor {
      */
     formatBigData2Mark: (reg: any, className: any) => void;
     /**
-     * 高亮全角符号 ·|￥|、|：|“|”|【|】|（|）|《|》
+     * 高亮全角符号 ·|￥|、|：|"|"|【|】|（|）|《|》
      * full width翻译为全角
      */
     formatFullWidthMark(): void;
     /**
-     *
-     * @param {CodeMirror.Editor} codemirror
-     * @param {MouseEvent} evt
+     * 将全角符号转换为半角符号
+     * @param {EditorView | CM6AdapterType} editorView - 编辑器实例
+     * @param {MouseEvent} evt - 鼠标事件对象
      */
-    toHalfWidth(codemirror: CodeMirror.Editor, evt: MouseEvent): void;
+    toHalfWidth(editorView: EditorView | CM6AdapterType, evt: MouseEvent): void;
     /**
      *
      * @param {KeyboardEvent} e
-     * @param {CodeMirror.Editor} codemirror
+     * @param {EditorView} editorView
      */
-    onKeyup: (e: KeyboardEvent, codemirror: CodeMirror.Editor) => void;
+    /**
+     * 处理键盘弹起事件（keyup），用于高亮预览区对应的行
+     * @param {KeyboardEvent} e - 键盘事件对象
+     * @param {EditorView} editorView - CodeMirror 6 编辑器实例
+     */
+    onKeyup: (e: KeyboardEvent, editorView: EditorView) => void;
     /**
      *
      * @param {ClipboardEvent} e
-     * @param {CodeMirror.Editor} codemirror
+     * @param {CM6AdapterType} editorView
      */
-    onPaste(e: ClipboardEvent, codemirror: CodeMirror.Editor): void;
+    onPaste(e: ClipboardEvent, editorView: CM6AdapterType): void;
     /**
      *
      * @param {ClipboardEvent} event
      * @param {ClipboardEvent['clipboardData']} clipboardData
-     * @param {CodeMirror.Editor} codemirror
+     * @param {CM6AdapterType} editorView
      * @returns {boolean | void}
      */
-    handlePaste(event: ClipboardEvent, clipboardData: ClipboardEvent['clipboardData'], codemirror: CodeMirror.Editor): boolean | void;
+    handlePaste(event: ClipboardEvent, clipboardData: ClipboardEvent["clipboardData"], editorView: CM6AdapterType): boolean | void;
     fileUploadCount: number;
     /**
      *
-     * @param {CodeMirror.Editor} codemirror
+     * @param {EditorView} editorView
      */
-    onScroll: (codemirror: CodeMirror.Editor) => void;
-    disableScrollListener: boolean;
+    onScroll: (editorView: EditorView) => void;
     /**
      *
-     * @param {CodeMirror.Editor} codemirror
+     * @param {EditorView | CM6AdapterType} editorView - 当前的CodeMirror实例
      * @param {MouseEvent} evt
      */
-    onMouseDown: (codemirror: CodeMirror.Editor, evt: MouseEvent) => void;
+    onMouseDown: (editorView: EditorView | CM6AdapterType, evt: MouseEvent) => void;
     /**
      * 光标变化事件
      */
@@ -94,12 +93,6 @@ export default class Editor {
      */
     init(previewer: any): void;
     previewer: any;
-    /**
-     * @property
-     * @type {CodeMirror.Editor}
-     */
-    editor: CodeMirror.Editor;
-    domWidth: number;
     /**
      *
      * @param {number | null} beginLine 起始行，传入null时跳转到文档尾部
@@ -141,8 +134,55 @@ export default class Editor {
      * 设置编辑器值
      */
     setValue(value?: string): void;
+    /**
+     * 获取编辑器值
+     */
+    getValue(): string;
+    /**
+     * 替换选中的文本
+     */
+    replaceSelections(text?: any[]): void;
+    /**
+     * 获取光标位置
+     */
+    getCursor(): {
+        line: number;
+        ch: number;
+    };
+    /**
+     * 设置光标位置
+     */
+    setCursor(line: any, ch: any): void;
+    /**
+     * 聚焦编辑器
+     */
+    focus(): void;
+    /**
+     * 获取选中的文本
+     * @returns {string[]}
+     */
+    getSelections(): string[];
+    /**
+     * 获取当前选中的文本
+     * @returns {string}
+     */
+    getSelection(): string;
+    /**
+     * 设置选区
+     * @param {Object} from - 起始位置 {line: number, ch: number}
+     * @param {Object} to - 结束位置 {line: number, ch: number}
+     */
+    setSelection(from: any, to: any): void;
 }
-export type EditorConfiguration = import('~types/editor').EditorConfiguration;
-export type EditorEventCallback = import('~types/editor').EditorEventCallback;
-export type CodeMirror = typeof codemirror;
-import codemirror from "codemirror";
+export type EditorConfiguration = import("~types/editor").EditorConfiguration;
+export type EditorEventCallback = import("~types/editor").EditorEventCallback;
+export type CM6AdapterType = import("~types/editor").CM6Adapter;
+export type CodeMirror = typeof import("codemirror");
+export type MarkEffectValue = {
+    from: number;
+    to: number;
+    decoration?: Decoration;
+    options?: any;
+};
+import { EditorView } from '@codemirror/view';
+import { Decoration } from '@codemirror/view';

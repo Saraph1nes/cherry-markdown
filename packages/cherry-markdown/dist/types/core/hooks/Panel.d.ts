@@ -28,4 +28,4 @@ export default class Panel extends ParagraphBase {
     $getTargetType(name: any): "center" | "left" | "right" | "success" | "justify" | "primary" | "info" | "warning" | "danger";
     rule(): any;
 }
-import ParagraphBase from "@/core/ParagraphBase";
+import ParagraphBase from '@/core/ParagraphBase';

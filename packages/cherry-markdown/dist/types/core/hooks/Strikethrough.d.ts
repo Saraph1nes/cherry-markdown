@@ -10,4 +10,4 @@ export default class Strikethrough extends SyntaxBase {
         config: any;
     }): import("~types/syntax").BasicHookRegexpRule;
 }
-import SyntaxBase from "@/core/SyntaxBase";
+import SyntaxBase from '@/core/SyntaxBase';

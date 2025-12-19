@@ -4,7 +4,7 @@ export default class Engine {
      * @param {Partial<import('./Cherry').CherryOptions>} markdownParams 初始化Cherry时传入的选项
      * @param {import('./Cherry').default} cherry Cherry实例
      */
-    constructor(markdownParams: Partial<import('./Cherry').CherryOptions>, cherry: import('./Cherry').default);
+    constructor(markdownParams: Partial<import("./Cherry").CherryOptions>, cherry: import("./Cherry").default);
     $cherry: import("./Cherry").default;
     hookCenter: HookCenter;
     hooks: Record<import("../types/syntax").HookType, SyntaxBase[]>;
@@ -17,7 +17,7 @@ export default class Engine {
     currentStrMd5: any[];
     globalConfig: {
         classicBr?: boolean;
-        urlProcessor?: (url: string, srcType: "link" | "audio" | "video" | "image" | "autolink", callback?: any) => string;
+        urlProcessor?: (url: string, srcType: "image" | "audio" | "video" | "autolink" | "link", callback?: any) => string;
         htmlWhiteList?: string;
         htmlBlackList?: string;
         htmlAttrWhiteList?: string;
@@ -63,7 +63,10 @@ export default class Engine {
     };
     $dealParagraph(md: any): any;
     $cacheBigData(md: any): any;
-    $deCacheBigData(md: any): any;
+    /**
+     * @param {string} md
+     */
+    $deCacheBigData(md: string): string;
     /**
      * 流式输出场景时，在最后增加一个光标占位
      * @param {string} md 内容
@@ -82,7 +85,7 @@ export default class Engine {
      * @param {'string'|'object'} returnType 返回格式，string：返回html字符串，object：返回结构化数据
      * @returns {string|object} 获取html
      */
-    makeHtml(md: string, returnType?: 'string' | 'object'): string | object;
+    makeHtml(md: string, returnType?: "string" | "object"): string | object;
     makeHtmlForBlockquote(md: any): any;
     makeHtmlForFootnote(md: any): any;
     mounted(): void;
@@ -92,7 +95,7 @@ export default class Engine {
      */
     makeMarkdown(html: string): string;
 }
-import HookCenter from "./core/HookCenter";
-import SyntaxBase from "./core/SyntaxBase";
-import AsyncRenderHandler from "./utils/async-render-handler";
-import LRUCache from "./utils/LRUCache";
+import HookCenter from './core/HookCenter';
+import SyntaxBase from './core/SyntaxBase';
+import AsyncRenderHandler from './utils/async-render-handler';
+import LRUCache from './utils/LRUCache';

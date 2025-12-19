@@ -35,6 +35,14 @@ export default class SearchBox {
      */
     constructor($cherry: object);
     $cherry: any;
+    searchState: {
+        posFrom: any;
+        posTo: any;
+        lastQuery: any;
+        query: any;
+        overlay: any;
+        annotate: any;
+    };
     init(cm: any): void;
     cm: any;
     element: ChildNode;
@@ -79,7 +87,14 @@ export default class SearchBox {
     searchOverlay(query: any, caseInsensitive: any): {
         token(stream: any): string;
     };
-    getSearchState(cm: any): any;
+    getSearchState(cm: any): {
+        posFrom: any;
+        posTo: any;
+        lastQuery: any;
+        query: any;
+        overlay: any;
+        annotate: any;
+    };
     clearSearch(cm: any): void;
     updateCount(): void;
     updateLocaleStrings(): void;

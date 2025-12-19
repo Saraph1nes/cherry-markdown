@@ -22,7 +22,7 @@ export default class MenuBase {
      * @deprecated
      * @type {MenuBase['fire']}
      */
-    _onClick: MenuBase['fire'];
+    _onClick: MenuBase["fire"];
     $cherry: MenuBaseConstructorParams;
     bubbleMenu: boolean;
     subMenu: any;
@@ -30,7 +30,7 @@ export default class MenuBase {
     name: string;
     iconName: string;
     /** @type {import('~types/menus').MenuIconType} */
-    iconType: import('~types/menus').MenuIconType;
+    iconType: import("~types/menus").MenuIconType;
     editor: import("@/Editor").default;
     locale: any;
     dom: HTMLSpanElement;
@@ -44,10 +44,11 @@ export default class MenuBase {
      * @property
      * @type {'absolute' | 'fixed' | 'sidebar'}
      */
-    positionModel: 'absolute' | 'fixed' | 'sidebar';
+    positionModel: "absolute" | "fixed" | "sidebar";
     /**
      * 处理菜单项点击事件
      * @param {MouseEvent | KeyboardEvent | undefined} [event] 点击事件
+     * @param {string} [shortKey] 快捷键参数
      * @returns {void}
      */
     fire(event?: MouseEvent | KeyboardEvent | undefined, shortKey?: string): void;
@@ -90,12 +91,12 @@ export default class MenuBase {
      * 创建一个SVG类型的图标
      * @param {import('~types/menus').CustomMenuIcon} options
      */
-    createSvgIcon(options: import('~types/menus').CustomMenuIcon): Element;
+    createSvgIcon(options: import("~types/menus").CustomMenuIcon): Element;
     /**
      * 创建一个Image类型的图标
      * @param {import('~types/menus').CustomMenuIcon} options
      */
-    createImageIcon(options: import('~types/menus').CustomMenuIcon): HTMLImageElement;
+    createImageIcon(options: import("~types/menus").CustomMenuIcon): HTMLImageElement;
     /**
      * 创建一个一级菜单
      * @param {boolean} asSubMenu 是否以子菜单的形式创建
@@ -108,11 +109,22 @@ export default class MenuBase {
     createSubBtnByConfig(config: SubMenuConfigItem): HTMLSpanElement;
     isSelections: boolean;
     /**
-     * 获取当前选择区域的range
+     * 替换选区并智能调整光标位置（CodeMirror 6版本）
+     * @param {string[]} replacements 替换文本数组
+     */
+    $replaceSelectionsWithCursor(replacements: string[]): void;
+    /**
+     * 获取当前选择区域的range (完全兼容版本)
      */
     $getSelectionRange(): {
-        begin: import("codemirror").Position;
-        end: import("codemirror").Position;
+        begin: {
+            line: number;
+            ch: number;
+        };
+        end: {
+            line: number;
+            ch: number;
+        };
     };
     /**
      * 注册点击事件渲染后的回调函数
@@ -131,7 +143,7 @@ export default class MenuBase {
      */
     setLessSelection(lessBefore: string, lessAfter: string): void;
     /**
-     * 基于当前已选择区域，获取更多的选择区
+     * 基于当前已选择区域，获取更多的选择区 (CodeMirror 6 现代风格)
      * @param {string} [appendBefore] 选择区前面追加的内容
      * @param {string} [appendAfter] 选择区后面追加的内容
      * @param {function} [cb] 回调函数，如果返回false，则恢复原来的选取
@@ -159,7 +171,7 @@ export default class MenuBase {
      * 更新菜单图标
      * @param {import('~types/menus').CustomMenuConfig['icon']} options 图标配置
      */
-    updateMenuIcon(options: import('~types/menus').CustomMenuConfig['icon']): boolean;
+    updateMenuIcon(options: import("~types/menus").CustomMenuConfig["icon"]): boolean;
     /**
      * 获取当前菜单的位置
      */
@@ -195,8 +207,8 @@ export type SubMenuConfigItem = {
      */
     disabledHideAllSubMenu?: boolean | undefined;
 };
-export type HookShortcutKeyMap = Record<string, import('~types/cherry').ShortcutKeyMapStruct>;
-export type Editor = import('@/Editor').default;
-export type MenuBaseConstructorParams = Partial<import('@/Cherry').default> & {
-    $currentMenuOptions?: import('~types/menus').CustomMenuConfig;
+export type HookShortcutKeyMap = Record<string, import("~types/cherry").ShortcutKeyMapStruct>;
+export type Editor = import("@/Editor").default;
+export type MenuBaseConstructorParams = Partial<import("@/Cherry").default> & {
+    $currentMenuOptions?: import("~types/menus").CustomMenuConfig;
 };

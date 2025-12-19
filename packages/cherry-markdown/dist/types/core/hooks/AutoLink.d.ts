@@ -30,4 +30,4 @@ export default class AutoLink extends SyntaxBase {
      */
     renderLink(url: string, text?: string): string;
 }
-import SyntaxBase from "@/core/SyntaxBase";
+import SyntaxBase from '@/core/SyntaxBase';

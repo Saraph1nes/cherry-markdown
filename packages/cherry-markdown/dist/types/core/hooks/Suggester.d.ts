@@ -78,7 +78,7 @@ export type SuggesterConfigItem = {
 export type SuggesterConfig = {
     suggester: Array<SuggesterConfigItem>;
 };
-import SyntaxBase from "@/core/SyntaxBase";
+import SyntaxBase from '@/core/SyntaxBase';
 declare class SuggesterPanel {
     constructor(cherry: any);
     searchCache: boolean;
@@ -99,7 +99,7 @@ declare class SuggesterPanel {
      * 设置编辑器
      * @param {import('@/Editor').default} editor
      */
-    setEditor(editor: import('@/Editor').default): void;
+    setEditor(editor: import("@/Editor").default): void;
     editor: import("@/Editor").default;
     setSuggester(suggester: any): void;
     bindEvent(): void;
@@ -146,7 +146,7 @@ declare class SuggesterPanel {
      */
     relocatePanelWithBoundaryCheck(): boolean;
     stopRelate(): void;
-    cursorTo: import("codemirror").Position;
+    cursorTo: any;
     /**
      * 粘贴选择结果
      * @param {number} idx 选择的结果索引

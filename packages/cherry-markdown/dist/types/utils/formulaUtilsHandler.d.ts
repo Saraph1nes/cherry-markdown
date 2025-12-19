@@ -6,7 +6,7 @@ export default class FormulaHandler {
      * @param {HTMLDivElement} previewerDom 预览器dom
      * @param {import('../Editor').default} editor 编辑器实例
      */
-    constructor(trigger: string, target: Element, container: HTMLDivElement, previewerDom: HTMLDivElement, editor: import('../Editor').default);
+    constructor(trigger: string, target: Element, container: HTMLDivElement, previewerDom: HTMLDivElement, editor: import("../Editor").default);
     /** @type{HTMLElement} */
     bubbleContainer: HTMLElement;
     trigger: string;

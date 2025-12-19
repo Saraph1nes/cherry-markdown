@@ -102,4 +102,4 @@ export default class CodeBlock extends ParagraphBase {
         reg: RegExp;
     };
 }
-import ParagraphBase from "@/core/ParagraphBase";
+import ParagraphBase from '@/core/ParagraphBase';

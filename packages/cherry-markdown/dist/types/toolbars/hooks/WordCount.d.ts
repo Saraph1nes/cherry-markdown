@@ -18,4 +18,4 @@ export default class wordCount extends MenuBase {
      */
     wordCount(markdown: string): any;
 }
-import MenuBase from "@/toolbars/MenuBase";
+import MenuBase from '@/toolbars/MenuBase';

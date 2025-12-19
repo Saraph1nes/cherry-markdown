@@ -14,6 +14,6 @@
  * limitations under the License.
  */
 /**
- * @param {CodeMirror.Editor} cm
+ * @param {import('~types/editor').CM6Adapter} cm
  */
-export function handleNewlineIndentList(cm: CodeMirror.Editor): void;
+export function handleNewlineIndentList(cm: import("~types/editor").CM6Adapter): void;

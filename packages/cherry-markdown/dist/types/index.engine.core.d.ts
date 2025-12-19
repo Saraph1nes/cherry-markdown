@@ -1,13 +1,13 @@
 export default CherryEngineExport;
-import SyntaxHookBase from "./core/SyntaxBase";
-import MenuHookBase from "./toolbars/MenuBase";
-type CherryEngineExport = typeof CherryStatic & (new (options: Partial<import('~types/cherry').CherryOptions>) => Engine);
+import SyntaxHookBase from './core/SyntaxBase';
+import MenuHookBase from './toolbars/MenuBase';
+type CherryEngineExport = typeof CherryStatic & (new (options: Partial<import("~types/cherry").CherryOptions>) => Engine);
 /**
  * @typedef {typeof CherryStatic & (new (options: Partial<import('~types/cherry').CherryOptions>) => Engine)}
  */
 declare const CherryEngineExport: typeof CherryEngine;
-import { CherryStatic } from "./CherryStatic";
-import Engine from "./Engine";
+import { CherryStatic } from './CherryStatic';
+import Engine from './Engine';
 declare class CherryEngine extends CherryStatic {
     /**
      * @private

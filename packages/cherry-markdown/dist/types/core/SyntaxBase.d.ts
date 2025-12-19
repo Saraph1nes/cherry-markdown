@@ -28,12 +28,12 @@ export default class SyntaxBase {
      * @protected
      * @type {import('../Engine').default}
      */
-    protected $engine: import('../Engine').default;
+    protected $engine: import("../Engine").default;
     $locale: any;
     /**
      * @type {EditorConfig['externals']}
      */
-    $externals: EditorConfig['externals'];
+    $externals: EditorConfig["externals"];
     RULE: import("~types/syntax").HookRegexpRule;
     getType(): import("~types/syntax").HookType;
     getName(): string;
@@ -94,7 +94,7 @@ export default class SyntaxBase {
     rule(editorConfig: Partial<EditorConfig>): HookRegexpRule;
     mounted(): void;
 }
-export type HookType = import('~types/syntax').HookType;
-export type HookTypesList = import('~types/syntax').HookTypesList;
-export type EditorConfig = import('~types/syntax').EditorConfig;
-export type HookRegexpRule = import('~types/syntax').HookRegexpRule;
+export type HookType = import("~types/syntax").HookType;
+export type HookTypesList = import("~types/syntax").HookTypesList;
+export type EditorConfig = import("~types/syntax").EditorConfig;
+export type HookRegexpRule = import("~types/syntax").HookRegexpRule;

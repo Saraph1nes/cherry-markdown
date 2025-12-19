@@ -5,7 +5,7 @@ export default class AsyncRenderHandler {
     /**
      * @param {import('../Cherry').default} cherry Cherry实例
      */
-    constructor(cherry: import('../Cherry').default);
+    constructor(cherry: import("../Cherry").default);
     pendingRenderers: Set<any>;
     originMd: string;
     md: string;

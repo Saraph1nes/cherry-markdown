@@ -3,11 +3,11 @@ export default class ShortcutKeyConfigPanel {
      *
      * @param {Partial<import('@/Cherry').default> & {$currentMenuOptions?:import('~types/menus').CustomMenuConfig}} $cherry
      */
-    constructor($cherry: Partial<import('@/Cherry').default> & {
-        $currentMenuOptions?: import('~types/menus').CustomMenuConfig;
+    constructor($cherry: Partial<import("@/Cherry").default> & {
+        $currentMenuOptions?: import("~types/menus").CustomMenuConfig;
     });
     $cherry: Partial<import("@/Cherry").default> & {
-        $currentMenuOptions?: import('~types/menus').CustomMenuConfig;
+        $currentMenuOptions?: import("~types/menus").CustomMenuConfig;
     };
     shortcutUlClassName: string;
     shortcutUlId: string;
@@ -55,7 +55,7 @@ export default class ShortcutKeyConfigPanel {
      * 更新提示文本
      * @param {'default' | 'editing' | 'static'} type 提示类型
      */
-    updateTipText(type?: 'default' | 'editing' | 'static'): void;
+    updateTipText(type?: "default" | "editing" | "static"): void;
     /**
      * 取消编辑的快捷键
      * @param {HTMLElement} item

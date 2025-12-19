@@ -1,4 +1,5 @@
 /** @typedef {import('~types/cherry').CherryOptions} CherryOptions */
+/** @typedef {import('~types/editor').CM6Adapter} CM6AdapterType */
 export default class Cherry extends CherryStatic {
     /**
      * @protected
@@ -23,9 +24,9 @@ export default class Cherry extends CherryStatic {
      * @property
      * @type {CherryOptions}
      */
-    options: Partial<import("~types/cherry")._CherryOptions<import("~types/cherry").CherryCustomOptions>>;
+    options: CherryOptions;
     /** @type {import('./utils/cm-search-replace').default} SearchBox 实例 */
-    searchBoxInstance: import('./utils/cm-search-replace').default;
+    searchBoxInstance: import("./utils/cm-search-replace").default;
     /** @type {boolean} 是否初始化SearchBox */
     searchBoxInit: boolean;
     storageFloatPreviewerWrapData: {
@@ -280,9 +281,7 @@ export default class Cherry extends CherryStatic {
             insertClass: string;
             insertPie: string;
             scatterTable: string;
-            insertGantt: string; /**
-             * @protected
-             */
+            insertGantt: string;
             checklist: string;
             ol: string;
             ul: string;
@@ -526,10 +525,7 @@ export default class Cherry extends CherryStatic {
             colorPickerPresetColors: string;
             small: string;
             medium: string;
-            large: string; /**
-             * @property
-             * @type {string} 实例ID
-             */
+            large: string;
             superLarge: string;
             detailDefaultContent: string;
             inlineCode: string;
@@ -632,7 +628,7 @@ export default class Cherry extends CherryStatic {
     /**
      * @type {import('./Engine').default}
      */
-    engine: import('./Engine').default;
+    engine: import("./Engine").default;
     /**
      * 初始化工具栏、编辑区、预览区等
      * @private
@@ -671,7 +667,7 @@ export default class Cherry extends CherryStatic {
      * @param {'edit&preview'|'editOnly'|'previewOnly'} [model=edit&preview] 模式类型
      * 一般纯预览模式和纯编辑模式适合在屏幕较小的终端使用，比如手机移动端
      */
-    switchModel(model?: 'edit&preview' | 'editOnly' | 'previewOnly', showToolbar?: boolean): void;
+    switchModel(model?: "edit&preview" | "editOnly" | "previewOnly", showToolbar?: boolean): void;
     /**
      * 获取实例id
      * @returns {string}
@@ -695,9 +691,9 @@ export default class Cherry extends CherryStatic {
     getMarkdown(): string;
     /**
      * 获取CodeMirror 实例
-     * @returns { CodeMirror.Editor } CodeMirror实例
+     * @returns { CM6AdapterType } CodeMirror 6 适配器实例
      */
-    getCodeMirror(): CodeMirror.Editor;
+    getCodeMirror(): CM6AdapterType;
     /**
      * 获取预览区内的html内容
      * @param {boolean} [wrapTheme=true] 是否在外层包裹主题class
@@ -779,7 +775,7 @@ export default class Cherry extends CherryStatic {
      * @param {Array} [toolbar] 要重置的对应工具栏配置
      * @returns {Boolean}
      */
-    public resetToolbar(type?: 'toolbar' | 'toolbarRight' | 'sidebar' | 'bubble' | 'float', toolbar?: any[]): boolean;
+    public resetToolbar(type?: "toolbar" | "toolbarRight" | "sidebar" | "bubble" | "float", toolbar?: any[]): boolean;
     /**
      * @private
      * @returns {Toolbar}
@@ -836,13 +832,19 @@ export default class Cherry extends CherryStatic {
     pageHeight: number;
     /**
      * @private
-     * @param {import('codemirror').Editor} codemirror
+     * @param {EditorView | Object} editorView
      */
     private initText;
     /**
      * @private
      * @param {Event} _evt
-     * @param {import('codemirror').Editor} codemirror
+     * @param {EditorView} editorView
+     */
+    /**
+     * 编辑器内容变更时触发,更新预览区内容
+     * @private
+     * @param {Event} _evt - 编辑事件对象(未使用)
+     * @param {EditorView | Object} editorView - 编辑器实例
      */
     private editText;
     timer: NodeJS.Timeout;
@@ -863,7 +865,7 @@ export default class Cherry extends CherryStatic {
      * 'pdf'：导出成pdf文件; 'img'：导出成png图片; 'markdown'：导出成markdown文件; 'html'：导出成html文件;
      * @param {string} [fileName] 导出文件名(默认为当前第一行内容|'cherry-export')
      */
-    public export(type?: 'pdf' | 'img' | 'markdown' | 'html', fileName?: string): void;
+    public export(type?: "pdf" | "img" | "markdown" | "html", fileName?: string): void;
     /**
      * 获取第一行文本
      * @param {string} defaultText 默认文本
@@ -895,21 +897,22 @@ export default class Cherry extends CherryStatic {
      * 切换TOC的模式（极简 or 展开）
      * @param {'full'|'pure'|''} focusModel 是否强制切换模式，如果为空，则根据当前模式切换
      */
-    toggleToc(focusModel?: 'full' | 'pure' | ''): void;
+    toggleToc(focusModel?: "full" | "pure" | ""): void;
     /**
      * 清空流程会话中添加的虚拟光标
      */
     clearFlowSessionCursor(): void;
 }
-export type CherryOptions = import('~types/cherry').CherryOptions;
-import { CherryStatic } from "./CherryStatic";
-import Event from "./Event";
-import Toc from "./toolbars/Toc";
-import Editor from "./Editor";
-import Previewer from "./Previewer";
-import Toolbar from "./toolbars/Toolbar";
-import ToolbarRight from "./toolbars/ToolbarRight";
-import Sidebar from "./toolbars/Sidebar";
-import HiddenToolbar from "./toolbars/HiddenToolbar";
-import FloatMenu from "./toolbars/FloatMenu";
-import Bubble from "./toolbars/Bubble";
+export type CherryOptions = import("~types/cherry").CherryOptions;
+export type CM6AdapterType = import("~types/editor").CM6Adapter;
+import { CherryStatic } from './CherryStatic';
+import Event from './Event';
+import Toc from './toolbars/Toc';
+import Previewer from './Previewer';
+import Toolbar from './toolbars/Toolbar';
+import ToolbarRight from './toolbars/ToolbarRight';
+import Sidebar from './toolbars/Sidebar';
+import HiddenToolbar from './toolbars/HiddenToolbar';
+import FloatMenu from './toolbars/FloatMenu';
+import Bubble from './toolbars/Bubble';
+import Editor from './Editor';

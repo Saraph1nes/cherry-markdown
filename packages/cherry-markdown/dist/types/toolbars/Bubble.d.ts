@@ -5,8 +5,8 @@ export default class Bubble extends Toolbar {
     /**
      * @type {'flex' | 'block'}
      */
-    static displayType: 'flex' | 'block';
-    set visible(arg: boolean);
+    static displayType: "flex" | "block";
+    set visible(visible: boolean);
     get visible(): boolean;
     bubbleDom: HTMLDivElement;
     editorDom: any;
@@ -40,4 +40,4 @@ export default class Bubble extends Toolbar {
     lastSelections: any;
     lastSelectionsStr: any;
 }
-import Toolbar from "./Toolbar";
+import Toolbar from './Toolbar';

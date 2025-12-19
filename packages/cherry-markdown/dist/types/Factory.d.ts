@@ -16,7 +16,7 @@ export function createMenuHook(name: any, options: any): {
         subMenuConfig: any;
         onClick(...args: any[]): any;
         readonly shortcutKeys: any;
-        _onClick: (event?: MouseEvent | KeyboardEvent, shortKey?: string) => void;
+        _onClick: MenuBase["fire"];
         $cherry: import("./toolbars/MenuBase").MenuBaseConstructorParams;
         bubbleMenu: boolean;
         subMenu: any;
@@ -28,23 +28,30 @@ export function createMenuHook(name: any, options: any): {
         dom: HTMLSpanElement;
         updateMarkdown: boolean;
         cacheOnce: boolean;
-        positionModel: "fixed" | "absolute" | "sidebar";
-        fire(event?: MouseEvent | KeyboardEvent, shortKey?: string): void;
-        shortcutKeyMap: Record<string, import("../types/cherry").ShortcutKeyMapStruct>;
+        positionModel: "absolute" | "fixed" | "sidebar";
+        fire(event?: MouseEvent | KeyboardEvent | undefined, shortKey?: string): void;
+        shortcutKeyMap: import("./toolbars/MenuBase").HookShortcutKeyMap;
         getSubMenuConfig(): import("./toolbars/MenuBase").SubMenuConfigItem[];
         setName(name: string, iconName?: string): void;
         setCacheOnce(info: any): void;
         getAndCleanCacheOnce(): boolean;
         hasCacheOnce(): boolean;
-        createIconFontIcon(iconName: string, options?: any): HTMLElement;
+        createIconFontIcon(iconName: string, options?: object): HTMLElement;
         createSvgIcon(options: import("../types/menus").CustomMenuIcon): Element;
         createImageIcon(options: import("../types/menus").CustomMenuIcon): HTMLImageElement;
         createBtn(asSubMenu?: boolean): HTMLSpanElement;
-        createSubBtnByConfig(config: import("./toolbars/MenuBase").SubMenuConfigItem): HTMLSpanElement;
+        createSubBtnByConfig(config: SubMenuConfigItem): HTMLSpanElement;
         isSelections: boolean;
+        $replaceSelectionsWithCursor(replacements: string[]): void;
         $getSelectionRange(): {
-            begin: import("codemirror").Position;
-            end: import("codemirror").Position;
+            begin: {
+                line: number;
+                ch: number;
+            };
+            end: {
+                line: number;
+                ch: number;
+            };
         };
         registerAfterClickCb(cb: Function): void;
         afterClickCb: Function;
@@ -53,7 +60,7 @@ export function createMenuHook(name: any, options: any): {
         getMoreSelection(appendBefore?: string, appendAfter?: string, cb?: Function): void;
         getSelection(selection: string, type?: string, focus?: boolean): string;
         bindSubClick(shortcut: any, selection: any): void;
-        updateMenuIcon(options: string | HTMLElement | import("../types/menus").CustomMenuIcon): boolean;
+        updateMenuIcon(options: import("../types/menus").CustomMenuConfig["icon"]): boolean;
         getMenuPosition(): Pick<DOMRect, "height" | "width" | "left" | "top">;
         hide(): void;
         show(): void;
@@ -61,3 +68,4 @@ export function createMenuHook(name: any, options: any): {
     };
     getTargetParentByButton(dom: HTMLElement): HTMLElement;
 };
+import MenuBase from './toolbars/MenuBase';

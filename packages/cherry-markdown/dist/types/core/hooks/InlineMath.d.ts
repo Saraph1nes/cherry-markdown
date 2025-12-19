@@ -8,7 +8,7 @@ export default class InlineMath extends ParagraphBase {
         cherry: any;
     });
     /** @type {'katex' | 'MathJax' | 'node'} */
-    engine: 'katex' | 'MathJax' | 'node';
+    engine: "katex" | "MathJax" | "node";
     katex: any;
     MathJax: any;
     $cherry: any;
@@ -25,4 +25,4 @@ export default class InlineMath extends ParagraphBase {
         end: string;
     };
 }
-import ParagraphBase from "@/core/ParagraphBase";
+import ParagraphBase from '@/core/ParagraphBase';

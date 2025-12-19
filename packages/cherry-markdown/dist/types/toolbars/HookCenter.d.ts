@@ -28,7 +28,7 @@ export default class HookCenter {
      * @param {null|import('~types/menus').CustomMenuConfig} options 菜单配置项
      * @returns
      */
-    $newMenu(name: string, options?: null | import('~types/menus').CustomMenuConfig): void;
+    $newMenu(name: string, options?: null | import("~types/menus").CustomMenuConfig): void;
     /**
      * 根据配置动态渲染、绑定工具栏
      * @returns
