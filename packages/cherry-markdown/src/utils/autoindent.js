@@ -15,7 +15,7 @@
  */
 
 /**
- * @param {CodeMirror.Editor} cm
+ * @param {import('~types/editor').CM6Adapter} cm
  */
 export function handleNewlineIndentList(cm) {
   if (handleCherryList(cm)) return;

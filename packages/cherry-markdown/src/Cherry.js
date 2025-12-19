@@ -49,6 +49,7 @@ import { CherryStatic } from './CherryStatic';
 import { LIST_CONTENT } from '@/utils/regexp';
 
 /** @typedef {import('~types/cherry').CherryOptions} CherryOptions */
+/** @typedef {import('~types/editor').CM6Adapter} CM6AdapterType */
 export default class Cherry extends CherryStatic {
   /**
    * @protected
@@ -435,7 +436,8 @@ export default class Cherry extends CherryStatic {
    * @returns markdown源码内容
    */
   getValue() {
-    return this.editor.editor.view.state.doc.toString();
+    // @ts-ignore - CM6Adapter 有 view 属性
+    return this.editor.editor.getValue();
   }
 
   /**
@@ -448,7 +450,7 @@ export default class Cherry extends CherryStatic {
 
   /**
    * 获取CodeMirror 实例
-   * @returns { EditorView } CodeMirror 6 EditorView实例
+   * @returns { CM6AdapterType } CodeMirror 6 适配器实例
    */
   getCodeMirror() {
     return this.editor.editor;
@@ -568,7 +570,7 @@ export default class Cherry extends CherryStatic {
     }
 
     editorView.dispatch(transaction);
-    focus && editorView.focus();
+    editorView.focus();
   }
 
   /**
@@ -1063,7 +1065,7 @@ export default class Cherry extends CherryStatic {
     // CodeMirror 6 使用事件系统，通过 $event 来监听变化
     this.$event.on('onChange', () => {
       cb({
-        markdown: this.editor.editor.view.state.doc.toString(), // CodeMirror 6 API
+        markdown: this.editor.editor.getValue(), // CodeMirror 6 API
       });
     });
   }
@@ -1074,9 +1076,10 @@ export default class Cherry extends CherryStatic {
    */
   fireShortcutKey(evt) {
     // 获取当前光标位置 - CodeMirror 6 API
-    const selection = this.editor.editor.view.state.selection.main;
+    const view = this.editor.editor.view;
+    const selection = view.state.selection.main;
     const pos = selection.head;
-    const line = this.editor.editor.view.state.doc.lineAt(pos);
+    const line = view.state.doc.lineAt(pos);
     const lineContent = line.text;
     const cursor = { line: line.number - 1, ch: pos - line.from };
 
@@ -1086,7 +1089,7 @@ export default class Cherry extends CherryStatic {
       if (cursor.ch === 0 || cursor.ch === lineContent.length || cursor.ch === lineContent.length + 1) {
         evt.preventDefault();
         // 使用 CodeMirror 6 API 替换整行内容
-        this.editor.editor.view.dispatch({
+        view.dispatch({
           changes: {
             from: line.from,
             to: line.to,

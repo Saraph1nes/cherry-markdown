@@ -15,7 +15,7 @@
  */
 // @ts-check
 import { EditorView, keymap, placeholder, lineNumbers, Decoration, WidgetType } from '@codemirror/view';
-import { EditorState, StateEffect, StateField, EditorSelection } from '@codemirror/state';
+import { EditorState, StateEffect, StateField, EditorSelection, Transaction } from '@codemirror/state';
 import { markdown } from '@codemirror/lang-markdown';
 import { search, searchKeymap, SearchQuery, setSearchQuery } from '@codemirror/search';
 import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands';
@@ -154,10 +154,20 @@ const cherryHighlighter = tagHighlighter([
 /**
  * @typedef {import('~types/editor').EditorConfiguration} EditorConfiguration
  * @typedef {import('~types/editor').EditorEventCallback} EditorEventCallback
+ * @typedef {import('~types/editor').CM6Adapter} CM6AdapterType
  * @typedef {import('codemirror')} CodeMirror
  */
 
+/**
+ * @typedef {Object} MarkEffectValue
+ * @property {number} from
+ * @property {number} to
+ * @property {Decoration} [decoration]
+ * @property {Object} [options]
+ */
+
 // 创建搜索高亮效果 - 用于添加 cm-searching 类
+/** @type {import('@codemirror/state').StateEffectType<import('@codemirror/view').DecorationSet>} */
 const setSearchHighlightEffect = StateEffect.define();
 
 // 搜索高亮的 StateField
@@ -181,11 +191,37 @@ const searchHighlightField = StateField.define({
 
 /**
  * CodeMirror 6 适配器 - 提供与 CodeMirror 5 兼容的 API
+ * @implements {CM6AdapterType}
  */
 class CM6Adapter {
   constructor(view) {
     this.view = view;
     this._eventHandlers = new Map();
+  }
+
+  // 代理属性 - 直接访问底层 EditorView 的属性
+  get state() {
+    return this.view.state;
+  }
+
+  get scrollDOM() {
+    return this.view.scrollDOM;
+  }
+
+  dispatch(...args) {
+    return this.view.dispatch(...args);
+  }
+
+  requestMeasure(...args) {
+    return this.view.requestMeasure(...args);
+  }
+
+  posAtCoords(...args) {
+    return this.view.posAtCoords(...args);
+  }
+
+  lineBlockAt(...args) {
+    return this.view.lineBlockAt(...args);
   }
 
   // 获取当前值
@@ -677,8 +713,8 @@ class CM6Adapter {
           let origin;
           if (update.transactions.length > 0) {
             const tr = update.transactions[0];
-            if (tr.annotation && tr.annotation.userEvent) {
-              const userEvent = tr.annotation.userEvent;
+            const userEvent = tr.annotation(Transaction.userEvent);
+            if (userEvent) {
               if (userEvent.includes('input')) origin = '+input';
               else if (userEvent.includes('delete')) origin = '+delete';
               else if (userEvent.includes('undo')) origin = 'undo';
@@ -735,7 +771,9 @@ class ReplacementWidget extends WidgetType {
 }
 
 // Mark 状态管理
+/** @type {import('@codemirror/state').StateEffectType<MarkEffectValue>} */
 const addMark = StateEffect.define();
+/** @type {import('@codemirror/state').StateEffectType<{from: number, to: number}>} */
 const removeMark = StateEffect.define();
 
 const markField = StateField.define({
@@ -745,11 +783,11 @@ const markField = StateField.define({
   update(marks, tr) {
     marks = marks.map(tr.changes);
     for (let effect of tr.effects) {
-      if (effect.is(addMark)) {
+      if (effect.is(addMark) && effect.value) {
         marks = marks.update({
           add: [effect.value.decoration.range(effect.value.from, effect.value.to)],
         });
-      } else if (effect.is(removeMark)) {
+      } else if (effect.is(removeMark) && effect.value) {
         marks = marks.update({
           filter: (from, to) => from !== effect.value.from || to !== effect.value.to,
         });
@@ -820,7 +858,7 @@ export default class Editor {
       onPaste: this.onPaste,
       onScroll: this.onScroll,
     };
-    /** @type {EditorView | null} */
+    /** @type {CM6AdapterType | null} */
     this.editor = null;
 
     // 添加缺失的属性
@@ -956,13 +994,8 @@ export default class Editor {
   }
 
   /**
-   *
-   * @param {CodeMirror.Editor} codemirror
-   * @param {MouseEvent} evt
-   */
-  /**
    * 将全角符号转换为半角符号
-   * @param {EditorView} editorView - 编辑器实例
+   * @param {EditorView | CM6AdapterType} editorView - 编辑器实例
    * @param {MouseEvent} evt - 鼠标事件对象
    */
   toHalfWidth(editorView, evt) {
@@ -1044,7 +1077,7 @@ export default class Editor {
   /**
    *
    * @param {ClipboardEvent} e
-   * @param {EditorView} editorView
+   * @param {CM6AdapterType} editorView
    */
   onPaste(e, editorView) {
     let { clipboardData } = e;
@@ -1060,7 +1093,7 @@ export default class Editor {
    *
    * @param {ClipboardEvent} event
    * @param {ClipboardEvent['clipboardData']} clipboardData
-   * @param {EditorView} editorView
+   * @param {CM6AdapterType} editorView
    * @returns {boolean | void}
    */
   handlePaste(event, clipboardData, editorView) {
@@ -1190,7 +1223,7 @@ export default class Editor {
 
   /**
    *
-   * @param {EditorView} editorView - 当前的CodeMirror实例
+   * @param {EditorView | CM6AdapterType} editorView - 当前的CodeMirror实例
    * @param {MouseEvent} evt
    */
   onMouseDown = (editorView, evt) => {
@@ -1198,6 +1231,8 @@ export default class Editor {
     this.$cherry.$event.emit('cleanAllSubMenus'); // Bubble中处理需要考虑太多，直接在编辑器中处理可包括Bubble中所有情况，因为产生Bubble的前提是光标在编辑器中 add by ufec
     
     // 适配 CM6Adapter
+    /** @type {EditorView} */
+    // @ts-ignore - editorView 可能是 CM6Adapter，它有 view 属性
     const view = editorView.view || editorView;
     
     // 验证坐标值是否有效
@@ -1306,7 +1341,8 @@ export default class Editor {
           // (鼠标拖动选择通常不会产生userEvent)
           else if (update.transactions.length > 0) {
             const hasUserEvent = update.transactions.some(tr => {
-              const userEvent = tr.annotation ? tr.annotation.userEvent : null;
+              // 使用 Transaction.userEvent 注解类型来获取用户事件
+              const userEvent = tr.annotation(Transaction.userEvent);
               return userEvent !== null && userEvent !== undefined;
             });
             // 如果没有任何userEvent标记,很可能是鼠标选择
@@ -1318,7 +1354,7 @@ export default class Editor {
           console.log('Editor selectionChange:', {
             isUserInteraction,
             transactions: update.transactions.map(tr => ({
-              hasUserEvent: tr.annotation && tr.annotation.userEvent,
+              hasUserEvent: tr.annotation(Transaction.userEvent),
               isSelectUserEvent: tr.isUserEvent('select'),
             })),
           });
@@ -1433,11 +1469,11 @@ export default class Editor {
 
     editor.on('scroll', () => {
       this.$cherry.$event.emit('onScroll');
-      this.onScroll(view);
+      this.onScroll(editor.view);
     });
 
     editor.on('paste', (event) => {
-      this.onPaste(event, view);
+      this.onPaste(event, editor);
     });
 
     editor.on('mousedown', (event) => {
@@ -1738,6 +1774,8 @@ export default class Editor {
   getSelections() {
     if (!this.editor) return [];
     // 兼容 CM6Adapter,获取真正的 EditorView
+    /** @type {import('@codemirror/view').EditorView} */
+    // @ts-ignore - this.editor 是 CM6Adapter，它有 view 属性
     const view = this.editor.view || this.editor;
     const selections = view.state.selection.ranges.map((range) =>
       view.state.doc.sliceString(range.from, range.to),
@@ -1752,6 +1790,8 @@ export default class Editor {
   getSelection() {
     if (!this.editor) return '';
     // 兼容 CM6Adapter,获取真正的 EditorView
+    /** @type {import('@codemirror/view').EditorView} */
+    // @ts-ignore - this.editor 是 CM6Adapter，它有 view 属性
     const view = this.editor.view || this.editor;
     const selection = view.state.selection.main;
     return view.state.doc.sliceString(selection.from, selection.to);
@@ -1764,11 +1804,12 @@ export default class Editor {
    */
   setSelection(from, to) {
     if (!this.editor) return;
-    const doc = this.editor.state.doc;
+    const view = this.editor.view;
+    const doc = view.state.doc;
     const fromPos = doc.line(from.line + 1).from + from.ch;
     const toPos = doc.line(to.line + 1).from + to.ch;
     
-    this.editor.dispatch({
+    view.dispatch({
       selection: EditorSelection.range(fromPos, toPos),
     });
   }

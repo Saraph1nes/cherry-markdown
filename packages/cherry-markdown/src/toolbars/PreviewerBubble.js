@@ -260,17 +260,18 @@ export default class PreviewerBubble {
       return;
     }
     // CodeMirror 6 中设置选区需要使用 dispatch
-    const doc = this.editor.editor.view.state.doc;
+    const view = this.editor.editor.view;
+    const doc = view.state.doc;
     const fromPos = doc.line(targetLine + 1).from + targetCh;
     const toPos = doc.line(targetLine + 1).from + targetCh + 1;
-    this.editor.editor.view.dispatch({
+    view.dispatch({
       selection: { anchor: fromPos, head: toPos },
     });
 
     // CodeMirror 6 中替换选中内容
-    const selection = this.editor.editor.view.state.selection.main;
-    const selectedText = this.editor.editor.view.state.doc.sliceString(selection.from, selection.to);
-    this.editor.editor.view.dispatch({
+    const selection = view.state.selection.main;
+    const selectedText = view.state.doc.sliceString(selection.from, selection.to);
+    view.dispatch({
       changes: {
         from: selection.from,
         to: selection.to,
@@ -316,8 +317,9 @@ export default class PreviewerBubble {
           (newData) => {
             const { xmlData, base64 } = newData;
             // CodeMirror 6 中替换选中内容
-            const selection = this.editor.editor.view.state.selection.main;
-            this.editor.editor.view.dispatch({
+            const editorView = this.editor.editor.view;
+            const selection = editorView.state.selection.main;
+            editorView.dispatch({
               changes: {
                 from: selection.from,
                 to: selection.to,

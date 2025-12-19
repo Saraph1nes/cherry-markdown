@@ -341,6 +341,8 @@ export default class MenuBase {
    */
   $replaceSelectionsWithCursor(replacements) {
     const editorView = this.editor.editor;
+    /** @type {import('@codemirror/view').EditorView} */
+    // @ts-ignore - editorView 可能是 CM6Adapter，它有 view 属性
     const view = editorView.view || editorView;
     const { state } = view;
     const { selection } = state;
@@ -385,6 +387,8 @@ export default class MenuBase {
    */
   $getSelectionRange() {
     const editorView = this.editor.editor;
+    /** @type {import('@codemirror/view').EditorView} */
+    // @ts-ignore - editorView 可能是 CM6Adapter，它有 view 属性
     const view = editorView.view || editorView;
     const { state } = view;
     const { selection, doc } = state;
@@ -435,6 +439,8 @@ export default class MenuBase {
    */
   setLessSelection(lessBefore, lessAfter) {
     const editorView = this.editor.editor;
+    /** @type {import('@codemirror/view').EditorView} */
+    // @ts-ignore - editorView 可能是 CM6Adapter，它有 view 属性
     const cm = editorView.view || editorView;
     const { begin, end } = this.$getSelectionRange();
 
@@ -481,6 +487,8 @@ export default class MenuBase {
    */
   getMoreSelection(appendBefore = '', appendAfter = '', cb) {
     const editorView = this.editor.editor;
+    /** @type {import('@codemirror/view').EditorView} */
+    // @ts-ignore - editorView 可能是 CM6Adapter，它有 view 属性
     const view = editorView.view || editorView;
     const { state } = view;
     const { selection, doc } = state;
@@ -546,6 +554,8 @@ export default class MenuBase {
    */
   getSelection(selection, type = 'word', focus = false) {
     const editorView = this.editor.editor;
+    /** @type {import('@codemirror/view').EditorView} */
+    // @ts-ignore - editorView 可能是 CM6Adapter，它有 view 属性
     const view = editorView.view || editorView;
     // 多光标模式下不做处理
     if (this.isSelections) {
