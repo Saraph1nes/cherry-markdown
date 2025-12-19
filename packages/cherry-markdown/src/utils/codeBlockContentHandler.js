@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 import { getCodeBlockRule } from '@/utils/regexp';
-import { EditorView, lineNumbers } from '@codemirror/view';
+import { EditorView, lineNumbers, keymap } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
-import { keymap } from '@codemirror/view';
 import { defaultKeymap, indentWithTab } from '@codemirror/commands';
 import { getCodePreviewLangSelectElement } from '@/utils/code-preview-language-setting';
 import { copyToClip } from '@/utils/copy';

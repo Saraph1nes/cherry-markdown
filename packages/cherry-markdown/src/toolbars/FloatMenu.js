@@ -59,12 +59,6 @@ export default class FloatMenu extends Toolbar {
    */
   handleSelectionChange(event) {
     if (this.editor && this.editor.editor) {
-      const editorAdapter = this.editor.editor;
-      const view = editorAdapter.view || editorAdapter;
-      const selection = view.state.selection.main;
-      const line = view.state.doc.lineAt(selection.head);
-      const pos = { line: line.number - 1 };
-
       // 创建兼容的 CodeMirror 对象
       const compatCodeMirror = this.createCompatCodeMirror();
       this.cursorActivity(null, compatCodeMirror);

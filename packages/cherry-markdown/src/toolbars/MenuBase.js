@@ -347,32 +347,32 @@ export default class MenuBase {
     const changes = [];
     const newSelections = [];
     let offset = 0;
-    
+
     // 为每个选区创建替换变更
     selection.ranges.forEach((range, index) => {
       const replacement = String(replacements[index] || '');
       const { from, to } = range;
       const adjustedFrom = from + offset;
       const adjustedTo = to + offset;
-      
+
       changes.push({
         from: adjustedFrom,
         to: adjustedTo,
         insert: replacement,
       });
-      
+
       // 计算新选区的位置（选中整个替换后的文本）
       newSelections.push({
         anchor: adjustedFrom,
         head: adjustedFrom + replacement.length,
       });
-      
+
       // 累计偏移量，用于后续选区位置计算
       const oldLength = to - from;
       const newLength = replacement.length;
       offset += newLength - oldLength;
     });
-    
+
     // 应用更改并设置选区
     view.dispatch({
       changes,
@@ -437,18 +437,17 @@ export default class MenuBase {
     const editorView = this.editor.editor;
     const cm = editorView.view || editorView;
     const { begin, end } = this.$getSelectionRange();
-    
+
     // 计算 lessBefore 的偏移量
     const lessBeforeLines = lessBefore.match(/\n/g)?.length || 0;
     const newBeginLine = lessBeforeLines > 0 ? begin.line + lessBeforeLines : begin.line;
     const lessBeforeLastLine = lessBefore.replace(/^[\s\S]*?\n([^\n]*)$/, '$1');
-    const newBeginCh =
-      lessBeforeLines > 0 ? lessBeforeLastLine.length : begin.ch + lessBefore.length;
+    const newBeginCh = lessBeforeLines > 0 ? lessBeforeLastLine.length : begin.ch + lessBefore.length;
 
     // 计算 lessAfter 的偏移量
     const lessAfterLines = lessAfter.match(/\n/g)?.length || 0;
     const newEndLine = lessAfterLines > 0 ? end.line - lessAfterLines : end.line;
-    
+
     // 修复：当 lessAfterLines > 0 时，我们移动到了新的行，
     // newEndCh 应该是该行的实际长度，而不是基于 end.ch 计算
     let newEndCh;
