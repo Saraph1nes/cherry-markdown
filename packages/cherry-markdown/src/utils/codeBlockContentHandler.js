@@ -281,7 +281,7 @@ export default class CodeBlockHandler {
   $drawEditor() {
     const dom = document.createElement('div');
     dom.className = 'cherry-previewer-codeBlock-content-handler__input';
-    
+
     // 创建 CodeMirror 6 编辑器
     const editor = this.codeMirror;
     const extensions = [
@@ -294,17 +294,17 @@ export default class CodeBlockHandler {
         }
       }),
     ];
-    
+
     const state = EditorState.create({
       doc: this.codeMirror.getSelection(),
       extensions,
     });
-    
+
     const view = new EditorView({
       state,
       parent: dom,
     });
-    
+
     this.codeBlockEditor.editorDom.inputDiv = dom;
     this.codeBlockEditor.editorDom.inputDom = view;
     this.$updateEditorPosition();

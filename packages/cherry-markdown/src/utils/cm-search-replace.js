@@ -505,12 +505,12 @@ export default class SearchBox {
   startSearch(cm, state, query, caseSensitive) {
     state.queryText = query;
     state.query = this.parseQuery(query);
-    
+
     // CodeMirror 6: 使用 setSearchQuery 触发搜索高亮
     const isRegex = state.query instanceof RegExp;
     const searchString = isRegex ? state.query.source : query;
     cm.setSearchQuery(searchString, caseSensitive, isRegex);
-    
+
     if (state.annotate) {
       state.annotate.clear();
       state.annotate = null;
@@ -553,13 +553,13 @@ export default class SearchBox {
   clearSearch(cm) {
     // CodeMirror 6: 清除搜索高亮
     cm.clearSearchQuery();
-    
+
     const state = this.getSearchState(cm);
     state.lastQuery = state.query;
     if (!state.query) return;
     state.query = null;
     state.queryText = null;
-    
+
     if (state.annotate) {
       state.annotate.clear();
       state.annotate = null;

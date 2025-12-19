@@ -264,9 +264,9 @@ export default class PreviewerBubble {
     const fromPos = doc.line(targetLine + 1).from + targetCh;
     const toPos = doc.line(targetLine + 1).from + targetCh + 1;
     this.editor.editor.view.dispatch({
-      selection: { anchor: fromPos, head: toPos }
+      selection: { anchor: fromPos, head: toPos },
     });
-    
+
     // CodeMirror 6 中替换选中内容
     const selection = this.editor.editor.view.state.selection.main;
     const selectedText = this.editor.editor.view.state.doc.sliceString(selection.from, selection.to);
@@ -274,8 +274,8 @@ export default class PreviewerBubble {
       changes: {
         from: selection.from,
         to: selection.to,
-        insert: selectedText === ' ' ? 'x' : ' '
-      }
+        insert: selectedText === ' ' ? 'x' : ' ',
+      },
     });
   }
 
@@ -321,8 +321,8 @@ export default class PreviewerBubble {
               changes: {
                 from: selection.from,
                 to: selection.to,
-                insert: `(${base64}){data-type=drawio data-xml=${encodeURI(xmlData)}}`
-              }
+                insert: `(${base64}){data-type=drawio data-xml=${encodeURI(xmlData)}}`,
+              },
             });
           },
         );
@@ -733,7 +733,7 @@ export default class PreviewerBubble {
             const fromPos = doc.line(line + 1).from + beginCh;
             const toPos = doc.line(line + 1).from + endCh;
             this.editor.editor.view.dispatch({
-              selection: { anchor: fromPos, head: toPos }
+              selection: { anchor: fromPos, head: toPos },
             });
             // 更新后需要再调用一次markText机制
             this.editor.dealSpecialWords();
@@ -794,7 +794,7 @@ export default class PreviewerBubble {
             const fromPos = doc.line(line + 1).from + beginCh;
             const toPos = doc.line(line + 1).from + endCh;
             this.editor.editor.view.dispatch({
-              selection: { anchor: fromPos, head: toPos }
+              selection: { anchor: fromPos, head: toPos },
             });
             return true;
           }
@@ -883,8 +883,8 @@ export default class PreviewerBubble {
       changes: {
         from: selection.from,
         to: selection.to,
-        insert: [this.imgSize, this.imgDeco, this.imgAlign].filter((v) => v).join(' ')
-      }
+        insert: [this.imgSize, this.imgDeco, this.imgAlign].filter((v) => v).join(' '),
+      },
     });
   }
 
