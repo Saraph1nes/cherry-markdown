@@ -36,7 +36,7 @@ export default class Toc {
       this.updateTocList();
     }, 300);
     // 使用 Cherry 的事件系统替代 CodeMirror 5 的 on 方法
-    this.$cherry.$event.on('onChange', () => {
+    this.$cherry.$event.on('afterChange', () => {
       clearTimeout(this.timer);
       this.timer = setTimeout(() => {
         this.updateTocList();

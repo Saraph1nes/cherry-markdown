@@ -15,6 +15,7 @@
  */
 
 import { getValueWithoutCode, LIST_CONTENT } from '@/utils/regexp';
+import { Transaction } from '@codemirror/state';
 
 export default class ListHandler {
   /** @type{HTMLElement} */
@@ -78,6 +79,7 @@ export default class ListHandler {
     const cursor = this.editor.editor.view.state.selection.main.head; // 获取光标位置
     this.editor.editor.view.dispatch({
       selection: { anchor: cursor, head: cursor },
+      annotations: Transaction.userEvent.of('list.edit'),
     }); // 取消选中
   }
 
@@ -136,6 +138,7 @@ export default class ListHandler {
 
     this.editor.editor.view.dispatch({
       selection: { anchor: fromPos, head: toPos },
+      annotations: Transaction.userEvent.of('list.edit'),
     });
     this.range = [fromPos, toPos];
     this.position = this.editor.editor.view.state.selection.main.head; // 输入就获取光标位置，防止后面点到编辑器dom的时候光标位置不对
@@ -175,6 +178,7 @@ export default class ListHandler {
           const [from, to] = this.range;
           this.editor.editor.view.dispatch({
             changes: { from, to, insert: md },
+            annotations: Transaction.userEvent.of('list.edit'),
           });
         }
         this.isCheckbox = false;
@@ -226,6 +230,7 @@ export default class ListHandler {
         anchor: replaceTo + insertContent.length,
         head: replaceTo + insertContent.length,
       },
+      annotations: Transaction.userEvent.of('list.edit'),
     });
 
     // 将光标聚焦到编辑器上

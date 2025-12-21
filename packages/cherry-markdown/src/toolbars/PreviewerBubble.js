@@ -24,6 +24,7 @@ import { imgDrawioReg, getValueWithoutCode } from '@/utils/regexp';
 import debounce from 'lodash/debounce';
 import FormulaHandler from '@/utils/formulaUtilsHandler';
 import ListHandler from '@/utils/listContentHandler';
+import { Transaction } from '@codemirror/state';
 
 /**
  * 预览区域的响应式工具栏
@@ -260,12 +261,14 @@ export default class PreviewerBubble {
       return;
     }
     // CodeMirror 6 中设置选区需要使用 dispatch
+    // 添加 userEvent 注解标记这是程序触发的操作，避免显示 bubble 菜单
     const view = this.editor.editor.view;
     const doc = view.state.doc;
     const fromPos = doc.line(targetLine + 1).from + targetCh;
     const toPos = doc.line(targetLine + 1).from + targetCh + 1;
     view.dispatch({
       selection: { anchor: fromPos, head: toPos },
+      annotations: Transaction.userEvent.of('checklist.toggle'),
     });
 
     // CodeMirror 6 中替换选中内容
@@ -277,6 +280,7 @@ export default class PreviewerBubble {
         to: selection.to,
         insert: selectedText === ' ' ? 'x' : ' ',
       },
+      annotations: Transaction.userEvent.of('checklist.toggle'),
     });
   }
 

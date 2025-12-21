@@ -1063,7 +1063,7 @@ export default class Cherry extends CherryStatic {
    */
   onChange(cb) {
     // CodeMirror 6 使用事件系统，通过 $event 来监听变化
-    this.$event.on('onChange', () => {
+    this.$event.on('afterChange', () => {
       cb({
         markdown: this.editor.editor.getValue(), // CodeMirror 6 API
       });

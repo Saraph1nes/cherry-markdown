@@ -167,7 +167,7 @@ export default class Bubble extends Toolbar {
   }
 
   addSelectionChangeListener() {
-    this.$cherry.$event.on('onChange', () => {
+    this.$cherry.$event.on('afterChange', () => {
       // 当编辑区内容变更时自动隐藏bubble工具栏
       this.hideBubble();
     });

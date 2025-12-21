@@ -43,7 +43,7 @@ export default class FloatMenu extends Toolbar {
     });
 
     // 监听编辑器内容变化事件
-    this.$cherry.$event.on('onChange', () => {
+    this.$cherry.$event.on('afterChange', () => {
       this.handleContentChange();
     });
 
